@@ -1,0 +1,25 @@
+# Gradle / Android
+.gradle/
+build/
+*/build/
+.cxx/
+captures/
+*.apk
+*.aab
+*.iml
+.idea/
+local.properties
+
+# Secrets: NEVER commit
+keystore.properties
+*.jks
+*.keystore
+*.pem
+.env
+.env.*
+supabase/.env
+supabase/.temp/
+
+# OS
+.DS_Store
+Thumbs.db
