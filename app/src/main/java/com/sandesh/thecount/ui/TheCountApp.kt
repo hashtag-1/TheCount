@@ -4,10 +4,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -26,24 +22,19 @@ fun TheCountApp() {
     val context = LocalContext.current
     val factory = ViewModelFactory(context.applicationContext as android.app.Application)
     val viewModel: HomeViewModel = viewModel(factory = factory)
-    var selectedDateForEntry by remember { mutableStateOf(LocalDate.now()) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
-        AppNavHost(navController = navController, viewModel = viewModel) { date ->
-            selectedDateForEntry = date
-            navController.navigate(Routes.ENTRY)
-        }
+        AppNavHost(navController = navController, viewModel = viewModel)
     }
 }
 
 @Composable
 fun AppNavHost(
     navController: NavHostController,
-    viewModel: HomeViewModel,
-    onDateSelectedForEntry: (LocalDate) -> Unit
+    viewModel: HomeViewModel
 ) {
     NavHost(
         navController = navController,
@@ -51,9 +42,7 @@ fun AppNavHost(
     ) {
         composable(Routes.HOME) {
             HomeScreen(
-                onEntryClick = {
-                    onDateSelectedForEntry(LocalDate.now())
-                },
+                onEntryClick = { navController.navigate(Routes.ENTRY) },
                 onCalendarClick = { navController.navigate(Routes.CALENDAR) },
                 onEarningsClick = { navController.navigate(Routes.EARNINGS) },
                 onPaymentsClick = { navController.navigate(Routes.PAYMENTS) },
@@ -83,10 +72,10 @@ fun AppNavHost(
             EarningsScreen(onBack = { navController.popBackStack() }, viewModel = viewModel)
         }
         composable(Routes.PAYMENTS) {
-            PaymentsScreen(onBack = { navController.popBackStack() })
+            PaymentsScreen(onBack = { navController.popBackStack() }, viewModel = viewModel)
         }
         composable(Routes.ADD_PAYMENT) {
-            AddPaymentScreen(onBack = { navController.popBackStack() })
+            AddPaymentScreen(onBack = { navController.popBackStack() }, viewModel = viewModel)
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(

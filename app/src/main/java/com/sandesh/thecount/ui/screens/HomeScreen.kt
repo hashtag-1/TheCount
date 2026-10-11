@@ -34,6 +34,7 @@ import com.sandesh.thecount.util.MoneyFormat
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.util.Locale
+import java.math.BigDecimal
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +49,8 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val numberFormat = NumberFormat.getNumberInstance(Locale.US)
+    val earnings = uiState.earnings
+    val outstanding = earnings?.outstanding ?: BigDecimal.ZERO
 
     Scaffold(
         topBar = {
@@ -143,7 +146,7 @@ fun HomeScreen(
                         Text(text = "4. Earnings", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = uiState.earnings?.net?.let { MoneyFormat.format(it) } ?: SampleData.section4Receivable,
+                            text = earnings?.net?.let { MoneyFormat.format(it) } ?: "-",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -161,7 +164,7 @@ fun HomeScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = "5. Payments Received", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = SampleData.section5ReceivedTotal, style = MaterialTheme.typography.bodyMedium)
+                        Text(text = MoneyFormat.format(uiState.paymentsTotalUpToSelected), style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(text = "+ Add payment", style = MaterialTheme.typography.bodySmall)
                     }
@@ -179,7 +182,8 @@ fun HomeScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = "6. Outstanding Balance", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = SampleData.section6Outstanding, style = MaterialTheme.typography.bodyMedium)
+                        val status = if (outstanding.signum() == 0) "Fully settled" else if (outstanding.signum() < 0) "Overpaid / credit" else "Still owed"
+                        Text(text = "${MoneyFormat.format(outstanding)} - $status", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }

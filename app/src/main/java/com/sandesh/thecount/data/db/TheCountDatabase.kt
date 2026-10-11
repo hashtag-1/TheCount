@@ -7,13 +7,14 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
 @Database(
-    entities = [DailyStrokeEntity::class],
-    version = 1,
+    entities = [DailyStrokeEntity::class, PaymentEntity::class],
+    version = 2,
     exportSchema = false
 )
-@TypeConverters(Converters::class)
+@TypeConverters(Converters::class, BigDecimalConverter::class)
 abstract class TheCountDatabase : RoomDatabase() {
     abstract fun dailyStrokeDao(): DailyStrokeDao
+    abstract fun paymentDao(): PaymentDao
 
     companion object {
         @Volatile
