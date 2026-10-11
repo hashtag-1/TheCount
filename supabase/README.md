@@ -1,9 +1,10 @@
-# Supabase
+# Supabase: Migrations (Task 5A)
 
-The agent writes SQL here in Tasks 5A, 5B, 5C and 7A. You run it manually in the Supabase SQL editor.
+Run these in the Supabase SQL Editor in order: 001_schema.sql, 002_triggers.sql, 003_rls.sql.
 
-- migrations/  numbered SQL files, run in order, each once
-- tests/       verification scripts you run and report back
+Confirm RLS is ON for each table (in Table Editor / by querying `pg_tables` with `rowsecurity` or use Supabase UI). 
 
-Never put the service-role key, database password or connection string in this folder.
-The agent adds exact run steps and the admin guide (invite, revoke, count) here during Task 5B.
+Notes
+- These files create schema, triggers (server version bump, prevent user_id change, updated_at), and RLS policies. Ordinary users cannot read/write invitations, admins, or app_config.
+- Soft deletes use deleted_at; clients update deleted_at rather than hard-delete.
+- sync columns present as specified.
