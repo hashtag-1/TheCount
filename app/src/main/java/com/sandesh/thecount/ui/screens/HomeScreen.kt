@@ -23,10 +23,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.sandesh.thecount.ui.sample.SampleData
+import com.sandesh.thecount.ui.viewmodel.HomeViewModel
+import java.text.NumberFormat
+import java.time.LocalDate
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,8 +42,12 @@ fun HomeScreen(
     onEarningsClick: () -> Unit,
     onPaymentsClick: () -> Unit,
     onAddPaymentClick: () -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    viewModel: HomeViewModel
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    val numberFormat = NumberFormat.getNumberInstance(Locale.US)
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -63,7 +73,7 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = SampleData.todayDate, style = MaterialTheme.typography.bodyMedium)
+                    Text(text = LocalDate.now().toString(), style = MaterialTheme.typography.bodyMedium)
                     Column(horizontalAlignment = Alignment.End) {
                         Text(text = SampleData.accountEmail, style = MaterialTheme.typography.bodySmall)
                         Text(text = SampleData.syncStatus, style = MaterialTheme.typography.bodySmall)
@@ -82,7 +92,7 @@ fun HomeScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = "1. Daily Entry (Today)", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = SampleData.section1Count, style = MaterialTheme.typography.bodyMedium)
+                        Text(text = uiState.todayCount?.toString() ?: "No entry", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -98,7 +108,10 @@ fun HomeScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = "2. History & Edit", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "${SampleData.section2SelectedDate}: ${SampleData.section2Count}", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "${uiState.selectedDate}: ${uiState.selectedDateCount?.toString() ?: "No entry"}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
                 }
             }
@@ -112,7 +125,7 @@ fun HomeScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = "3. Cumulative Strokes", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = SampleData.section3CumulativeStrokes, style = MaterialTheme.typography.bodyMedium)
+                        Text(text = numberFormat.format(uiState.cumulativeStrokes), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
