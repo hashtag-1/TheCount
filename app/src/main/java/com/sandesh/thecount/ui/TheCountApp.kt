@@ -66,7 +66,7 @@ fun AppNavHost(
             EntryScreen(
                 onBack = { navController.popBackStack() },
                 viewModel = viewModel,
-                date = java.time.LocalDate.now() // Will be updated via param
+                date = LocalDate.now()
             )
         }
         composable(Routes.CALENDAR) {
@@ -80,7 +80,7 @@ fun AppNavHost(
             )
         }
         composable(Routes.EARNINGS) {
-            EarningsScreen(onBack = { navController.popBackStack() })
+            EarningsScreen(onBack = { navController.popBackStack() }, viewModel = viewModel)
         }
         composable(Routes.PAYMENTS) {
             PaymentsScreen(onBack = { navController.popBackStack() })

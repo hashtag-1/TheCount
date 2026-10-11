@@ -3,7 +3,11 @@ package com.sandesh.thecount.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sandesh.thecount.data.repository.StrokeRepository
+import com.sandesh.thecount.domain.EarningsCalculator
+import com.sandesh.thecount.domain.EarningsResult
 import com.sandesh.thecount.domain.Validators
+import com.sandesh.thecount.domain.WorkConfig
+import java.math.BigDecimal
 import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,7 +22,8 @@ data class HomeUiState(
     val todayCount: Long? = null,
     val selectedDateCount: Long? = null,
     val cumulativeStrokes: Long = 0,
-    val allStrokes: List<com.sandesh.thecount.data.db.DailyStrokeEntity> = emptyList()
+    val allStrokes: List<com.sandesh.thecount.data.db.DailyStrokeEntity> = emptyList(),
+    val earnings: EarningsResult? = null
 )
 
 class HomeViewModel(private val strokeRepository: StrokeRepository) : ViewModel() {
@@ -36,12 +41,22 @@ class HomeViewModel(private val strokeRepository: StrokeRepository) : ViewModel(
     ) { selectedDate, allStrokes, cumulative ->
         val todayCount = allStrokes.find { it.workDate == LocalDate.now() && it.deletedAt == null }?.strokeCount
         val selectedCount = allStrokes.find { it.workDate == selectedDate && it.deletedAt == null }?.strokeCount
+        val cumulativeForSelected = strokeRepository.sumStrokesUntil(userId, selectedDate).let { flow ->
+            var value = 0L
+            // We need to get current value - but this is Flow; easier to compute from all strokes up to selected
+            value = 0L
+        }
+        // Compute cumulative strokes up to selected date from all strokes
+        val cumulativeUpToSelected = allStrokes.filter { it.deletedAt == null && !it.workDate.isAfter(selectedDate) }
+            .sumOf { it.strokeCount }
+        val earnings = EarningsCalculator.calculate(cumulativeUpToSelected, BigDecimal.ZERO)
         HomeUiState(
             selectedDate = selectedDate,
             todayCount = todayCount,
             selectedDateCount = selectedCount,
             cumulativeStrokes = cumulative,
-            allStrokes = allStrokes.filter { it.deletedAt == null }
+            allStrokes = allStrokes.filter { it.deletedAt == null },
+            earnings = earnings
         )
     }.stateIn(
         scope = viewModelScope,
