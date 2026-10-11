@@ -8,7 +8,7 @@ The agent updates this after every task. Mark a task done only after the user ap
 | 2 | Room + daily strokes (Sections 1, 2) | done | Room wired to UI; validators all pass (9 tests). Soft delete/revive, no-dup on edit, persistent DB. Sections 3-6 still samples. |
 | 3 | Earnings engine (Sections 3, 4) | done | EarningsCalculator (pure) with BigDecimal HALF_UP, scale 2. HomeViewModel computes earnings for selected date; UI shows real values. All tests pass (19 total). User approved. |
 | 4 | Payments (Sections 5, 6) | done | Payments end-to-end local with v1->v2 migration (no destructive), earnings include payments, UI updated. User approved. |
-| 5A | Supabase schema + RLS | SQL written, NOT yet run by user | Created 001_schema.sql, 002_triggers.sql, 003_rls.sql, supabase/README.md. Cannot run against Supabase (no credentials). |
+| 5A | Supabase schema + RLS | SQL run by user, RLS confirmed | SQL files replaced/reviewed and run by user; all 6 tables show RLS enabled. |
 | 5B | Invitations + 120-user limit | not started | |
 | 5C | Backend verification (user runs SQL) | not started | |
 | 6A | Google OAuth config + Auth client | not started | |
@@ -19,7 +19,7 @@ The agent updates this after every task. Mark a task done only after the user ap
 | 9 | Final validation + release APK | not started | |
 
 ## Log
-- Task 5A: wrote SQL schema, triggers, RLS policies; added README with run instructions. No code changes to Android app.
+- Task 5A: SQL reviewed and run by user; RLS confirmed on all 6 tables.
 
 ## Manual setup done by the user
 - [ ] Android Studio + base project created
