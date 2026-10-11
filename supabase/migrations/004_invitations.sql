@@ -1,25 +1,27 @@
 -- 004_invitations.sql
--- Invitations, admins, app_config (server-managed)
+-- Invitation-only registration: config + helper functions. Run ONCE, after 003.
+-- (invitations, admins and app_config tables, RLS and the one-active-invitation-per-email
+--  index already exist from 001 and 003. Clients can never read or write them.)
 
--- Ensure app_config has max_users
-insert into app_config (key, value)
+-- Clean up anything an earlier draft of this task may have created (safe if absent).
+drop index    if exists public.idx_invitations_active_email;
+drop function if exists public.thecount_active_user_count();
+
+-- Maximum accounts. Change it later with: update public.app_config set value='120' where key='max_users';
+insert into public.app_config (key, value)
 values ('max_users', '120')
 on conflict (key) do nothing;
 
--- Optional helper to count active (non-deleted) profiles/users accounted for
-create or replace function thecount_active_user_count()
-returns bigint as $$
-  select count(*) from profiles where deleted_at is null;
-$$ language sql security definer set search_path = public;
+-- Dashboard helper: how many accounts hold a slot (every profile, active or suspended).
+create or replace function public.thecount_user_count()
+returns bigint
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*) from public.profiles;
+$$;
 
--- Invitations helper views/functions can be used by admins via dashboard;
--- no policies for ordinary users - RLS enabled but no grants/policies.
--- Ensure partial unique index exists (if not present)
-do $$
-begin
-  if not exists (
-    select 1 from pg_indexes where schemaname='public' and indexname='idx_invitations_active_email'
-  ) then
-    create unique index idx_invitations_active_email on invitations(email) where status = 'active';
-  end if;
-end $$;
+-- Supabase exposes public functions to the app by default. Lock these down.
+revoke all on function public.thecount_user_count() from public, anon, authenticated;

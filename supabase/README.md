@@ -1,47 +1,95 @@
-# Supabase: Migrations (Task 5B additions)
+# Supabase: migrations (Tasks 5A and 5B, reviewed)
 
-DO NOT edit 001_schema.sql, 002_triggers.sql or 003_rls.sql. Add 004 and 005 only.
+You run these by hand in the Supabase dashboard (SQL Editor). Nothing here connects to your
+project by itself. Never put the service-role key, database password or connection string
+in this folder.
 
-## Files
-- 004_invitations.sql: app_config max_users seed, active user count helper, ensure active-email index.
-- 005_registration_guard.sql: pending_registrations table (coordination), AFTER INSERT trigger on auth.users to create profile only when authorized; designed to work with Before User Created Auth Hook.
+## Run order (each file ONCE, in this order)
+1. `migrations/001_schema.sql`
+2. `migrations/002_triggers.sql`
+3. `migrations/003_rls.sql`  (ends with a table: all 6 tables must show rls_enabled = true)
+4. `migrations/004_invitations.sql`
+5. `migrations/005_registration_guard.sql`
 
-## How to enable Before User Created Auth Hook (recommended)
-This is the critical part: Before User Created runs before auth.users is created, so reject uninvited/over-limit signups before account exists.
+If a file fails, STOP and copy the exact error. Do not run the next one.
+Files 004/005 are safe even if you ran an earlier draft of them (they drop its leftovers).
 
-1. In Supabase Dashboard > Authentication > Hooks > New Hook
-2. Type: Before User Created
-3. Edge Function (recommended): create a function that:
-   - Receives event with email (normalize to lowercase)
-   - Runs in a transaction: acquire advisory lock (e.g. pg_advisory_xact_lock(hashtext(lower(email)))) and also lock app_config/max_users
-   - Check for active invitation: exists (select 1 from invitations where email=lower and status='active' and (expires_at is null or expires_at>now))
-   - Check user count: (select count(*) from profiles where deleted_at is null) < (select value::int from app_config where key='max_users')
-   - If valid: mark invitation as used? Or create pending reservation (use pending_registrations) so it can't be reused; atomically reserve slot
-   - On success: allow signup (don't create profile here). Profile created by AFTER INSERT on auth.users (trigger above) if reservation matches.
-   - On failure: raise error with clear message (e.g. "Not invited", "Account limit reached", "Invitation expired/revoked")
-4. The BEFORE hook must enforce in one transaction with lock: count profiles, check active invitation, consume/reserve invitation, ensure < max_users. If two concurrent signups, only one gets lock.
-5. Also ensure Google sign-in path goes through same hook (Supabase Auth triggers hooks for email/password and OAuth signups).
+## One-time dashboard settings (after 005)
+- Authentication -> Providers: turn OFF Email (and Phone). Only Google should be enabled.
+  (The guard also rejects non-Google sign-ups, this is a second lock.)
+- Authentication -> Hooks -> Before User Created (OPTIONAL): choose Postgres function
+  `public.hook_before_user_created`. It only gives the app a clearer "not invited" /
+  "limit reached" message. The real enforcement is the trigger and works without it.
 
-## Exact SQL commands (run in SQL Editor as needed)
+## BEFORE YOU FIRST SIGN IN: invite yourself
+Registration is closed until an invitation exists. Run the "invite" SQL below with YOUR own
+Google email, exactly as Google shows it, then sign in from the app (Task 6).
 
-- Invite an email: 
-  `insert into invitations (email) values (lower('user@example.com'));`
-- List invitations:
-  `select id, email, status, created_at, expires_at, used_at, used_by from invitations order by created_at desc;`
-- Revoke one (by id or email):
-  `update invitations set status='revoked', expires_at=now() where id='<id>' and status='active';` or by email
-- Change max_users:
-  `insert into app_config (key,value) values ('max_users','<n>') on conflict (key) do update set value=excluded.value;`
-- Set max_users to 120:
-  `insert into app_config (key,value) values ('max_users','120') on conflict (key) do update set value='120';`
-- Count users (active profiles):
-  `select thecount_active_user_count() as active_users;` or `select count(*) from profiles where deleted_at is null;`
+## What the guard does
+A trigger on auth.users runs in the same transaction that creates the account. Under one
+global lock it checks: Google sign-in, an active unexpired invitation for that email
+(lowercase), and accounts < max_users. If anything fails it raises an error, the transaction
+rolls back and NO account exists. If all pass it marks the invitation used and creates the
+profile (status active) in the same transaction. Two simultaneous sign-ups cannot both take
+the last slot. The app can never create a profile (no insert grant or policy), so without a
+profile every data table is empty and read-only-nothing for that user.
 
-## Important
-- Invitations matched in lowercase. Active invitation per email enforced by partial unique index.
-- Used invitations cannot create second account (consumed/reserved). 
-- Profiles created ONLY by server (trigger on auth.users after authorized signup). No app-side profile creation.
-- Enforcement must happen in one transaction with advisory lock to prevent last-slot race.
-- Cannot run SQL here; do not claim it works. RLS unchanged for existing tables.
+Errors start with: THECOUNT_NOT_INVITED, THECOUNT_LIMIT_REACHED or THECOUNT_DENIED.
+Without the hook, the app may only see a generic "Database error saving new user"; either way
+sign-up failed and the app should show Access Denied (Task 6B).
 
-See supabase/README.md for run order (004 after 003, 005 after 004).
+### What if something fails halfway?
+Nothing is left half-done: the check, the invitation update and the profile insert all
+commit or all roll back together. As a safety check, this lists accounts that have no profile
+(for example accounts created before 005 was installed). They have no data access:
+```sql
+select u.id, u.email, u.created_at
+from auth.users u left join public.profiles p on p.id = u.id
+where p.id is null;
+```
+Cleanup of such an account (only if you are sure): `delete from auth.users where id = '...';`
+
+## Admin guide (run in SQL Editor; no admin screen exists, D7)
+Invite an email (one active invitation per email; a duplicate gives an error):
+```sql
+insert into public.invitations (email) values (lower('person@gmail.com'));
+-- optional expiry: insert into public.invitations (email, expires_at)
+--   values (lower('person@gmail.com'), now() + interval '14 days');
+```
+List invitations:
+```sql
+select email, status, created_at, expires_at, used_at from public.invitations order by created_at desc;
+```
+Revoke an unused invitation:
+```sql
+update public.invitations set status = 'revoked'
+where email = lower('person@gmail.com') and status = 'active';
+```
+Block someone who already registered (they keep their data, but see nothing and cannot sync;
+they still occupy a slot):
+```sql
+update public.profiles set status = 'suspended' where email = lower('person@gmail.com');
+-- undo: set status = 'active'
+```
+Remove a user completely and free the slot (DELETES THEIR CLOUD DATA, cannot be undone):
+```sql
+delete from auth.users where email = lower('person@gmail.com');
+```
+That email needs a new invitation to join again (an invitation is single use).
+
+Count accounts / see the limit:
+```sql
+select public.thecount_user_count() as accounts,
+       (select value from public.app_config where key = 'max_users') as max_users;
+```
+Change the limit (also use 120 to restore it):
+```sql
+update public.app_config set value = '120' where key = 'max_users';
+```
+Gmail note: invite the address exactly as it appears in the person's Google account.
+
+## Not proven yet
+These were tested on a local Postgres with a mock of Supabase's auth schema (uninvited,
+expired, revoked, reused, over-limit, wrong provider, and 10 simultaneous sign-ups with a
+limit of 3: exactly 3 got in). They have NOT been run on your real project. Task 5C writes
+the tests you run there.
