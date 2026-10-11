@@ -7,7 +7,7 @@ The agent updates this after every task. Mark a task done only after the user ap
 | 1 | Android project setup + static UI | done | Navigation Compose added, WorkConfig, Routes, Home per LAYOUT.md, placeholders, SampleData, Material 3 theme, MainActivity replaced with navigation host. Built successfully. User verified on device. |
 | 2 | Room + daily strokes (Sections 1, 2) | done | Room wired to UI; validators all pass (9 tests). Soft delete/revive, no-dup on edit, persistent DB. Sections 3-6 still samples. |
 | 3 | Earnings engine (Sections 3, 4) | done | EarningsCalculator (pure) with BigDecimal HALF_UP, scale 2. HomeViewModel computes earnings for selected date; UI shows real values. All tests pass (19 total). User approved. |
-| 4 | Payments (Sections 5, 6) | done | Payments end-to-end local: entity/dao/repo, validators, DB v2 no destructive migration, earnings include real payments, UI shows totals/outstanding with status, add/list/delete with confirmation. User approved. |
+| 4 | Payments (Sections 5, 6) | built, awaiting user approval | Migration from v1 to v2 needed (create payments table only). Must not delete existing data. |
 | 5A | Supabase schema + RLS | not started | |
 | 5B | Invitations + 120-user limit | not started | |
 | 5C | Backend verification (user runs SQL) | not started | |
@@ -19,7 +19,7 @@ The agent updates this after every task. Mark a task done only after the user ap
 | 9 | Final validation + release APK | not started | |
 
 ## Log
-- Task 4: completed, tested, approved.
+- Task 4 migration fix: Task 4 marked awaiting approval. Need to add MIGRATION_1_2 to create payments table without touching daily_strokes. Search for fallbackToDestructiveMigration: none found in project.
 
 ## Manual setup done by the user
 - [ ] Android Studio + base project created

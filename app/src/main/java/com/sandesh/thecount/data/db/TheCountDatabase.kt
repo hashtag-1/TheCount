@@ -5,11 +5,13 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [DailyStrokeEntity::class, PaymentEntity::class],
     version = 2,
-    exportSchema = false
+    exportSchema = true
 )
 @TypeConverters(Converters::class, BigDecimalConverter::class)
 abstract class TheCountDatabase : RoomDatabase() {
@@ -26,7 +28,8 @@ abstract class TheCountDatabase : RoomDatabase() {
                     context.applicationContext,
                     TheCountDatabase::class.java,
                     "thecount_db"
-                ).build()
+                ).addMigrations(MIGRATION_1_2)
+                    .build()
                 INSTANCE = instance
                 instance
             }
