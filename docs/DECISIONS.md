@@ -19,3 +19,7 @@ Defaults the agent should follow. Edit a line here BEFORE the task that uses it 
 
 ## Agent-recorded decisions
 (Agent appends here when it makes a choice the spec left open.)
+
+| ID | Decision | Used in |
+|---|---|---|
+| D13 | Auth flow: supabase-kt 3.1.1 with Auth + Postgrest; AndroidX Credential Manager (1.3.0) + Google Identity Services (googleid 1.1.1); sign-in uses Google ID token passed to Supabase with a generated SHA-256 nonce. Server rejects handled as AccessDenied (catch messages starting THECOUNT_NOT_INVITED/LIMIT_REACHED/DENIED or generic "Database error saving new user"); network errors -> NetworkError; cancelled Google dialog -> Cancelled. | 6A |
