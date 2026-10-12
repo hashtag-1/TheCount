@@ -2,21 +2,16 @@ package com.sandesh.thecount.data.repository
 
 import android.content.Context
 import android.util.Log
-import androidx.credentials.exceptions.GetCredentialCancellationException
-import androidx.credentials.exceptions.NoCredentialException
 import com.sandesh.thecount.BuildConfig
 import com.sandesh.thecount.data.remote.SupabaseProvider
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.IDToken
+import io.github.jan.supabase.exceptions.HttpRequestException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
-import java.security.MessageDigest
-import java.util.UUID
 
 sealed class AuthResult {
     data object Success : AuthResult()
@@ -28,6 +23,11 @@ sealed class AuthResult {
 }
 
 class AuthRepository {
+
+    /**
+     * [nonce] must be the RAW nonce. The screen sends the SHA-256 hash of it to Google
+     * and passes the raw value here. Do not hash it in this function.
+     */
     suspend fun signInWithGoogle(context: Context, idToken: String, nonce: String): AuthResult =
         withContext(Dispatchers.IO) {
             try {
@@ -37,38 +37,26 @@ class AuthRepository {
                     this.nonce = nonce
                 }
                 AuthResult.Success
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Log.e("TheCountAuth", "${e.javaClass.simpleName}: ${e.message}")
+                // Log only the exception name and the first line, never headers, keys or tokens.
+                val firstLine = e.message?.lineSequence()?.firstOrNull().orEmpty()
+                Log.e("TheCountAuth", "${e.javaClass.simpleName}: $firstLine")
+
                 val message = e.message.orEmpty()
+                when {
+                    // Supabase rejected the account on purpose (invite rule)
+                    message.contains("THECOUNT_", ignoreCase = true) ||
+                            message.contains("Database error saving new user", ignoreCase = true) ->
+                        AuthResult.AccessDenied
 
-                // Network errors
-                if (e is IOException ||
-                    e is UnknownHostException ||
-                    e is SocketTimeoutException ||
-                    e is ConnectException ||
-                    message.contains("timeout", true) ||
-                    message.contains("timed out", true) ||
-                    message.contains("connect", true) ||
-                    message.contains("connection", true) ||
-                    message.contains("network", true) ||
-                    message.contains("unreachable", true) ||
-                    message.contains("UnknownHost", true) ||
-                    message.contains("SocketTimeout", true) ||
-                    message.contains("ConnectException", true) ||
-                    message.contains("HttpRequestTimeout", true) ||
-                    message.contains("request timed out", true)
-                ) {
-                    return@withContext AuthResult.NetworkError
+                    // Real network failures only, decided by exception type
+                    e is IOException || e is HttpRequestException ->
+                        AuthResult.NetworkError
+
+                    else -> AuthResult.Unknown()
                 }
-
-                // Supabase rejections
-                if (message.contains("THECOUNT_", true) ||
-                    message.contains("Database error saving new user", true)
-                ) {
-                    return@withContext AuthResult.AccessDenied
-                }
-
-                return@withContext AuthResult.Unknown()
             }
         }
 
@@ -76,14 +64,6 @@ class AuthRepository {
 
     suspend fun signOut() = withContext(Dispatchers.IO) {
         SupabaseProvider.client.auth.signOut()
-    }
-
-    fun generateNonce(): String {
-        val uuid = UUID.randomUUID().toString()
-        val bytes = uuid.toByteArray()
-        val md = MessageDigest.getInstance("SHA-256")
-        val digest = md.digest(bytes)
-        return digest.joinToString("") { "%02x".format(it) }
     }
 
     fun getGoogleWebClientId(): String = BuildConfig.GOOGLE_WEB_CLIENT_ID
