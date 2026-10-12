@@ -1,5 +1,6 @@
 package com.sandesh.thecount.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -17,10 +19,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,16 +33,12 @@ import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.sandesh.thecount.data.repository.AuthRepository
 import com.sandesh.thecount.data.repository.AuthResult
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.auth.providers.Google
-import io.github.jan.supabase.auth.providers.builtin.IDToken
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import androidx.compose.material3.CircularProgressIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,17 +102,23 @@ fun LoginScreen(
                                 val credential = result.credential
                                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                                 val idToken = googleIdTokenCredential.idToken
-                                when (authRepository.signInWithGoogle(context, idToken, nonce)) {
+                                when (val res = authRepository.signInWithGoogle(context, idToken, nonce)) {
                                     AuthResult.Success -> onSignInSuccess()
                                     AuthResult.AccessDenied -> onAccessDenied()
                                     AuthResult.NetworkError -> snackbarHostState.showSnackbar("No internet connection")
                                     AuthResult.Cancelled -> snackbarHostState.showSnackbar("Sign-in cancelled")
-                                    AuthResult.Unknown -> snackbarHostState.showSnackbar("Something went wrong. Please try again.")
+                                    is AuthResult.NoGoogleAccount -> snackbarHostState.showSnackbar(res.message)
+                                    is AuthResult.Unknown -> snackbarHostState.showSnackbar(res.message)
                                 }
                             } catch (e: GetCredentialCancellationException) {
+                                Log.e("TheCountAuth", "${e.javaClass.simpleName}: ${e.message}")
                                 snackbarHostState.showSnackbar("Sign-in cancelled")
+                            } catch (e: NoCredentialException) {
+                                Log.e("TheCountAuth", "${e.javaClass.simpleName}: ${e.message}")
+                                snackbarHostState.showSnackbar("No Google account is available on this phone. Add one in Settings and try again.")
                             } catch (e: Exception) {
-                                snackbarHostState.showSnackbar("No internet connection")
+                                Log.e("TheCountAuth", "${e.javaClass.simpleName}: ${e.message}")
+                                snackbarHostState.showSnackbar("Something went wrong. Please try again.")
                             } finally {
                                 isLoading = false
                             }

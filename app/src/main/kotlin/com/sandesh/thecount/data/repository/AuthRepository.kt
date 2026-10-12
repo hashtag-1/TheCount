@@ -1,6 +1,9 @@
 package com.sandesh.thecount.data.repository
 
 import android.content.Context
+import android.util.Log
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.NoCredentialException
 import com.sandesh.thecount.BuildConfig
 import com.sandesh.thecount.data.remote.SupabaseProvider
 import io.github.jan.supabase.auth.auth
@@ -8,6 +11,10 @@ import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.IDToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -15,8 +22,9 @@ sealed class AuthResult {
     data object Success : AuthResult()
     data object Cancelled : AuthResult()
     data object NetworkError : AuthResult()
+    data class NoGoogleAccount(val message: String = "No Google account is available on this phone. Add one in Settings and try again.") : AuthResult()
     data object AccessDenied : AuthResult()
-    data object Unknown : AuthResult()
+    data class Unknown(val message: String = "Something went wrong. Please try again.") : AuthResult()
 }
 
 class AuthRepository {
@@ -30,27 +38,37 @@ class AuthRepository {
                 }
                 AuthResult.Success
             } catch (e: Exception) {
+                Log.e("TheCountAuth", "${e.javaClass.simpleName}: ${e.message}")
                 val message = e.message.orEmpty()
-                when {
-                    message.contains("THECOUNT_NOT_INVITED", true) ||
-                    message.contains("THECOUNT_LIMIT_REACHED", true) ||
-                    message.contains("THECOUNT_DENIED", true) ||
-                    message.contains("Database error saving new user", true) ||
-                    message.contains("Access denied", true) ||
-                    message.contains("not authorized", true) ||
-                    message.contains("forbidden", true) -> AuthResult.AccessDenied
-                    message.contains("network", true) ||
+
+                // Network errors
+                if (e is IOException ||
+                    e is UnknownHostException ||
+                    e is SocketTimeoutException ||
+                    e is ConnectException ||
                     message.contains("timeout", true) ||
+                    message.contains("timed out", true) ||
+                    message.contains("connect", true) ||
                     message.contains("connection", true) ||
+                    message.contains("network", true) ||
                     message.contains("unreachable", true) ||
-                    message.contains("IOException", true) ||
-                    message.contains("UnknownHost", true) -> AuthResult.NetworkError
-                    message.contains("cancelled", true) ||
-                    message.contains("canceled", true) ||
-                    message.contains("user cancelled", true) ||
-                    message.contains("user canceled", true) -> AuthResult.Cancelled
-                    else -> AuthResult.Unknown
+                    message.contains("UnknownHost", true) ||
+                    message.contains("SocketTimeout", true) ||
+                    message.contains("ConnectException", true) ||
+                    message.contains("HttpRequestTimeout", true) ||
+                    message.contains("request timed out", true)
+                ) {
+                    return@withContext AuthResult.NetworkError
                 }
+
+                // Supabase rejections
+                if (message.contains("THECOUNT_", true) ||
+                    message.contains("Database error saving new user", true)
+                ) {
+                    return@withContext AuthResult.AccessDenied
+                }
+
+                return@withContext AuthResult.Unknown()
             }
         }
 
