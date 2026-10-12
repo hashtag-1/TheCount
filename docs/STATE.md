@@ -10,7 +10,7 @@ The agent updates this after every task. Mark a task done only after the user ap
 | 4 | Payments (Sections 5, 6) | done | Payments end-to-end local with v1->2 migration (non-destructive). User approved. |
 | 5A | Supabase schema + RLS | written and run by user | SQL run by user; RLS confirmed. |
 | 5B | Invitations + 120-user limit | written and run by user | Reviewed SQL run by user; email and phone sign-in disabled as configured. |
-| 5C | Backend verification (user runs SQL) | not started | awaiting scripts/verification. |
+| 5C | Backend verification (user runs SQL) | written | verification scripts and README written; awaiting user to run them (rls_isolation.sql, registration_guard.sql, optional concurrency test). Do not mark passed until user reports results. |
 | 6A | Google OAuth config + Auth client | not started | |
 | 6B | Session, access denied, account isolation | not started | |
 | 7A | Sync foundation + push | not started | |
@@ -20,6 +20,7 @@ The agent updates this after every task. Mark a task done only after the user ap
 
 ## Log
 - 5A and 5B: SQL reviewed and run by user; email/phone sign-in disabled.
+- 5C: Created verification scripts (supabase/tests/rls_isolation.sql, supabase/tests/registration_guard.sql, supabase/tests/concurrency/run.mjs with package.json) and supabase/tests/README.md with exact click-by-click steps, expected outputs, and security notes. Awaiting user to execute and report results.
 
 ## Manual setup done by the user
 - [ ] Android Studio + base project created
@@ -27,4 +28,3 @@ The agent updates this after every task. Mark a task done only after the user ap
 - [ ] SQL migrations run in Supabase
 - [ ] Google Cloud OAuth clients created, Google provider enabled in Supabase
 - [ ] Release keystore created and backed up
-
