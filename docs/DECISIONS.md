@@ -22,4 +22,4 @@ Defaults the agent should follow. Edit a line here BEFORE the task that uses it 
 
 | ID | Decision | Used in |
 |---|---|---|
-| D13 | Auth flow: supabase-kt 3.1.1 with Auth + Postgrest; AndroidX Credential Manager (1.3.0) + Google Identity Services (googleid 1.1.1); sign-in uses Google ID token passed to Supabase with a generated SHA-256 nonce. Server rejects handled as AccessDenied (catch messages starting THECOUNT_NOT_INVITED/LIMIT_REACHED/DENIED or generic "Database error saving new user"); network errors -> NetworkError; cancelled Google dialog -> Cancelled. | 6A |
+| D13 | Auth flow: supabase-kt 3.1.1 with Auth + Postgrest; AndroidX Credential Manager (1.3.0) + Google Identity Services (googleid 1.1.1); Google sign-in uses a nonce - send SHA-256 hex hash of the nonce to Google, pass the raw nonce to Supabase when signing in with ID token. Server rejects handled as AccessDenied (catch messages starting THECOUNT_NOT_INVITED/LIMIT_REACHED/DENIED or generic "Database error saving new user"); network errors -> NetworkError; cancelled Google dialog -> Cancelled. | 6A |
