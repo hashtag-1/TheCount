@@ -9,5 +9,5 @@ object WorkConfig {
     val TAX_RATE: BigDecimal = BigDecimal("0.01")
     const val CURRENCY = "रु"
     const val MAX_USERS = 120
-    const val ADMIN_CONTACT = ""
+    const val ADMIN_CONTACT = "snbhandari72003@gmail.com"
 }
