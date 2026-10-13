@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import java.time.LocalDate
+import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -52,4 +53,32 @@ interface DailyStrokeDao {
 
     @Query("SELECT COALESCE(SUM(stroke_count), 0) FROM daily_strokes WHERE user_id = :userId AND deleted_at IS NULL AND work_date >= :startDate AND work_date <= :endDate")
     fun sumStrokesUntil(userId: String, startDate: LocalDate, endDate: LocalDate): Flow<Long>
+
+    // Attach logic
+    @Query("SELECT COUNT(*) FROM daily_strokes WHERE user_id = 'local' AND deleted_at IS NULL")
+    suspend fun countLocalStrokes(): Int
+
+    @Query("SELECT work_date FROM daily_strokes WHERE user_id = 'local' AND deleted_at IS NULL")
+    suspend fun getLocalStrokeDates(): List<LocalDate>
+
+    @Query("SELECT work_date FROM daily_strokes WHERE user_id = :targetUserId AND work_date IN (:dates) AND deleted_at IS NULL")
+    suspend fun getClashingDates(targetUserId: String, dates: List<LocalDate>): List<LocalDate>
+
+    @Transaction
+    suspend fun attachLocalToUser(targetUserId: String, dates: List<LocalDate>): Int {
+        var updated = 0
+        for (date in dates) {
+            val entity = getByDate("local", date)
+            if (entity != null) {
+                val updatedEntity = entity.copy(
+                    userId = targetUserId,
+                    updatedAt = System.currentTimeMillis(),
+                    syncState = "PENDING_UPSERT"
+                )
+                update(updatedEntity)
+                updated++
+            }
+        }
+        return updated
+    }
 }

@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -39,39 +41,59 @@ class HomeViewModel(
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
 
-    private val userId = userProvider.currentUserId
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    val uiState: StateFlow<HomeUiState> = combine(
-        _selectedDate,
-        strokeRepository.observeAll(),
-        strokeRepository.sumStrokesUntil(LocalDate.now()),
-        paymentRepository?.observeAll() ?: kotlinx.coroutines.flow.flowOf(emptyList()),
-        paymentRepository?.sumPaymentsUntil(LocalDate.now()) ?: kotlinx.coroutines.flow.flowOf(BigDecimal.ZERO)
-    ) { selectedDate, allStrokes, cumulative, payments, paymentsTotal ->
-        val todayCount = allStrokes.find { it.workDate == LocalDate.now() && it.deletedAt == null }?.strokeCount
-        val selectedCount = allStrokes.find { it.workDate == selectedDate && it.deletedAt == null }?.strokeCount
-        val cumulativeUpToSelected = allStrokes.filter { it.deletedAt == null && !it.workDate.isAfter(selectedDate) }
-            .sumOf { it.strokeCount }
-        val paymentsUpToSelected = payments.filter { it.deletedAt == null && !it.paymentDate.isAfter(selectedDate) }
-            .sumOf { it.amount }
-        val earnings = EarningsCalculator.calculate(cumulativeUpToSelected, paymentsUpToSelected)
-        HomeUiState(
-            selectedDate = selectedDate,
-            todayCount = todayCount,
-            selectedDateCount = selectedCount,
-            cumulativeStrokes = cumulative,
-            allStrokes = allStrokes.filter { it.deletedAt == null },
-            earnings = earnings,
-            payments = payments.filter { it.deletedAt == null },
-            paymentsTotalUpToSelected = paymentsUpToSelected
-        )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = HomeUiState()
-    )
+    // Observe userId changes to reset selected date and other per-user state
+    private val userIdFlow = userProvider.currentUserIdFlow
+        .distinctUntilChanged()
+        .onEach { newUserId ->
+            // Reset selected date to today when user changes
+            _selectedDate.value = LocalDate.now()
+            _error.value = null
+        }
+        .launchIn(viewModelScope)
+
+    val uiState: StateFlow<HomeUiState> = userIdFlow.flatMapLatest { userId ->
+        // For "anonymous" user, return empty state immediately
+        if (userId == "anonymous") {
+            kotlinx.coroutines.flow.flowOf(HomeUiState()).stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = HomeUiState()
+            )
+        } else {
+            combine(
+                _selectedDate,
+                strokeRepository.observeAll(),
+                strokeRepository.sumStrokesUntil(LocalDate.now()),
+                paymentRepository?.observeAll() ?: kotlinx.coroutines.flow.flowOf(emptyList()),
+                paymentRepository?.sumPaymentsUntil(LocalDate.now()) ?: kotlinx.coroutines.flow.flowOf(BigDecimal.ZERO)
+            ) { selectedDate, allStrokes, cumulative, payments, paymentsTotal ->
+                val todayCount = allStrokes.find { it.workDate == LocalDate.now() && it.deletedAt == null }?.strokeCount
+                val selectedCount = allStrokes.find { it.workDate == selectedDate && it.deletedAt == null }?.strokeCount
+                val cumulativeUpToSelected = allStrokes.filter { it.deletedAt == null && !it.workDate.isAfter(selectedDate) }
+                    .sumOf { it.strokeCount }
+                val paymentsUpToSelected = payments.filter { it.deletedAt == null && !it.paymentDate.isAfter(selectedDate) }
+                    .sumOf { it.amount }
+                val earnings = EarningsCalculator.calculate(cumulativeUpToSelected, paymentsUpToSelected)
+                HomeUiState(
+                    selectedDate = selectedDate,
+                    todayCount = todayCount,
+                    selectedDateCount = selectedCount,
+                    cumulativeStrokes = cumulative,
+                    allStrokes = allStrokes.filter { it.deletedAt == null },
+                    earnings = earnings,
+                    payments = payments.filter { it.deletedAt == null },
+                    paymentsTotalUpToSelected = paymentsUpToSelected
+                )
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = HomeUiState()
+            )
+        }
+    }
 
     fun setSelectedDate(date: LocalDate) {
         _selectedDate.value = date
