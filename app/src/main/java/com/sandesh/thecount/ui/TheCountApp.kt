@@ -231,6 +231,11 @@ fun AppNavHost(
         startDestination = initialRoute
     ) {
         composable(Routes.HOME) {
+            // Whenever Home is shown again (after the entry, history or payment screens),
+            // go back to today, so Section 3 shows the full running total up to today.
+            LaunchedEffect(viewModel) {
+                viewModel.setSelectedDate(LocalDate.now())
+            }
             HomeScreen(
                 onEntryClick = {
                     viewModel.setSelectedDate(LocalDate.now())
