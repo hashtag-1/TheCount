@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsStateWithLifecycle
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,7 +61,7 @@ fun TheCountApp() {
     val attachManager = remember { AttachManager(strokeRepository, paymentRepository) }
 
     // Observe userId flow to trigger attach prompt and key ViewModel
-    val currentUserId by userProvider.currentUserIdFlow.collectAsStateWithLifecycle(initialValue = "anonymous")
+    val currentUserId by userProvider.currentUserIdFlow.collectAsState()
 
     var sessionChecked by remember { mutableStateOf(false) }
     var hasValidSession by remember { mutableStateOf(false) }

@@ -12,13 +12,14 @@ import com.sandesh.thecount.domain.Validators
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -38,62 +39,73 @@ class HomeViewModel(
     private val paymentRepository: PaymentRepository? = null,
     private val userProvider: CurrentUserProvider
 ) : ViewModel() {
+
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    // Observe userId changes to reset selected date and other per-user state
-    private val userIdFlow = userProvider.currentUserIdFlow
-        .distinctUntilChanged()
-        .onEach { newUserId ->
-            // Reset selected date to today when user changes
-            _selectedDate.value = LocalDate.now()
-            _error.value = null
-        }
-        .launchIn(viewModelScope)
+    // The signed-in user's id. A StateFlow already ignores repeated values.
+    private val userIdFlow: StateFlow<String> = userProvider.currentUserIdFlow
 
-    val uiState: StateFlow<HomeUiState> = userIdFlow.flatMapLatest { userId ->
-        // For "anonymous" user, return empty state immediately
-        if (userId == "anonymous") {
-            kotlinx.coroutines.flow.flowOf(HomeUiState()).stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = HomeUiState()
-            )
-        } else {
-            combine(
-                _selectedDate,
-                strokeRepository.observeAll(),
-                strokeRepository.sumStrokesUntil(LocalDate.now()),
-                paymentRepository?.observeAll() ?: kotlinx.coroutines.flow.flowOf(emptyList()),
-                paymentRepository?.sumPaymentsUntil(LocalDate.now()) ?: kotlinx.coroutines.flow.flowOf(BigDecimal.ZERO)
-            ) { selectedDate, allStrokes, cumulative, payments, paymentsTotal ->
-                val todayCount = allStrokes.find { it.workDate == LocalDate.now() && it.deletedAt == null }?.strokeCount
-                val selectedCount = allStrokes.find { it.workDate == selectedDate && it.deletedAt == null }?.strokeCount
-                val cumulativeUpToSelected = allStrokes.filter { it.deletedAt == null && !it.workDate.isAfter(selectedDate) }
-                    .sumOf { it.strokeCount }
-                val paymentsUpToSelected = payments.filter { it.deletedAt == null && !it.paymentDate.isAfter(selectedDate) }
-                    .sumOf { it.amount }
-                val earnings = EarningsCalculator.calculate(cumulativeUpToSelected, paymentsUpToSelected)
-                HomeUiState(
-                    selectedDate = selectedDate,
-                    todayCount = todayCount,
-                    selectedDateCount = selectedCount,
-                    cumulativeStrokes = cumulative,
-                    allStrokes = allStrokes.filter { it.deletedAt == null },
-                    earnings = earnings,
-                    payments = payments.filter { it.deletedAt == null },
-                    paymentsTotalUpToSelected = paymentsUpToSelected
-                )
-            }.stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = HomeUiState()
-            )
+    init {
+        // When the signed-in user changes, reset per-user screen state.
+        viewModelScope.launch {
+            userIdFlow.collect {
+                _selectedDate.value = LocalDate.now()
+                _error.value = null
+            }
         }
     }
+
+    // Every time the user id changes, the old queries are cancelled and new ones start,
+    // so a second account never keeps showing the first account's data.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val uiState: StateFlow<HomeUiState> = userIdFlow
+        .flatMapLatest { userId ->
+            if (userId == "anonymous") {
+                // Nobody signed in: show an empty state.
+                flowOf(HomeUiState())
+            } else {
+                combine(
+                    _selectedDate,
+                    strokeRepository.observeAll(),
+                    paymentRepository?.observeAll() ?: flowOf(emptyList())
+                ) { selectedDate, allStrokes, payments ->
+                    val liveStrokes = allStrokes.filter { it.deletedAt == null }
+                    val livePayments = payments.filter { it.deletedAt == null }
+
+                    val todayCount = liveStrokes.find { it.workDate == LocalDate.now() }?.strokeCount
+                    val selectedCount = liveStrokes.find { it.workDate == selectedDate }?.strokeCount
+
+                    val cumulativeUpToSelected = liveStrokes
+                        .filter { !it.workDate.isAfter(selectedDate) }
+                        .sumOf { it.strokeCount }
+                    val paymentsUpToSelected = livePayments
+                        .filter { !it.paymentDate.isAfter(selectedDate) }
+                        .sumOf { it.amount }
+
+                    val earnings = EarningsCalculator.calculate(cumulativeUpToSelected, paymentsUpToSelected)
+
+                    HomeUiState(
+                        selectedDate = selectedDate,
+                        todayCount = todayCount,
+                        selectedDateCount = selectedCount,
+                        cumulativeStrokes = cumulativeUpToSelected,
+                        allStrokes = liveStrokes,
+                        earnings = earnings,
+                        payments = livePayments,
+                        paymentsTotalUpToSelected = paymentsUpToSelected
+                    )
+                }
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = HomeUiState()
+        )
 
     fun setSelectedDate(date: LocalDate) {
         _selectedDate.value = date
