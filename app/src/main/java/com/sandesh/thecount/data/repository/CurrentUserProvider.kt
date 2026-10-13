@@ -50,13 +50,10 @@ class SessionUserProvider(context: Context) : CurrentUserProvider {
 
     private fun observeSession() {
         scope.launch {
-            // sessionStatus is the supabase-kt 3.x flow that reports sign-in and sign-out.
+            // sessionStatus reports sign-in and sign-out.
             SupabaseProvider.client.auth.sessionStatus.collect { status ->
                 when (status) {
-                    is SessionStatus.Authenticated -> {
-                        val user = status.session.user
-                        updateUserId(user?.id)
-                    }
+                    is SessionStatus.Authenticated -> updateUserId(status.session.user?.id)
                     is SessionStatus.NotAuthenticated -> updateUserId(null)
                     else -> {
                         // Initializing or a temporary refresh problem (for example offline):

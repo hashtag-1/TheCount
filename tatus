@@ -1,0 +1,6 @@
+[33mbcc055e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;32mwip-6b4-isolation[m[33m)[m Task 6B-4c: follow signed-in user; second account no longer sees first account's data
+[33mfd0b101[m WIP 6B-4: attach prompt plus isolation fix attempt (does not build yet)
+[33me13f65f[m Task 6B-3: single CurrentUserProvider (still local)
+[33m13c614d[m Task 6B-2: sign-out with confirmation and account email display
+[33m05db6d7[m Set admin contact
+[33m949e6a8[m Task 6A done

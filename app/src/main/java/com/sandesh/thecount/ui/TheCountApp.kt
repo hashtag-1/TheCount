@@ -24,20 +24,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.sandesh.thecount.data.db.TheCountDatabase
-import com.sandesh.thecount.data.remote.SupabaseProvider
 import com.sandesh.thecount.data.repository.AuthRepository
 import com.sandesh.thecount.data.repository.AttachManager
 import com.sandesh.thecount.data.repository.AttachResult
-import com.sandesh.thecount.data.repository.CurrentUserProvider
 import com.sandesh.thecount.data.repository.SessionUserProvider
 import com.sandesh.thecount.data.repository.StrokeRepository
 import com.sandesh.thecount.data.repository.PaymentRepository
@@ -52,15 +48,20 @@ import kotlinx.coroutines.launch
 fun TheCountApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
+    val app = context.applicationContext as android.app.Application
     val authRepository = remember { AuthRepository() }
     val scope = rememberCoroutineScope()
-    val userProvider = remember { SessionUserProvider(context.applicationContext as android.app.Application) }
-    val factory = ViewModelFactory(context.applicationContext as android.app.Application, userProvider)
-    val strokeRepository = remember { StrokeRepository(TheCountDatabase.getInstance(context.applicationContext as android.app.Application).dailyStrokeDao(), userProvider) }
-    val paymentRepository = remember { PaymentRepository(TheCountDatabase.getInstance(context.applicationContext as android.app.Application).paymentDao(), userProvider) }
+    val userProvider = remember { SessionUserProvider(app) }
+    val factory = remember { ViewModelFactory(app, userProvider) }
+    val strokeRepository = remember {
+        StrokeRepository(TheCountDatabase.getInstance(app).dailyStrokeDao(), userProvider)
+    }
+    val paymentRepository = remember {
+        PaymentRepository(TheCountDatabase.getInstance(app).paymentDao(), userProvider)
+    }
     val attachManager = remember { AttachManager(strokeRepository, paymentRepository) }
 
-    // Observe userId flow to trigger attach prompt and key ViewModel
+    // Observe userId flow to trigger the attach prompt and to key the ViewModel
     val currentUserId by userProvider.currentUserIdFlow.collectAsState()
 
     var sessionChecked by remember { mutableStateOf(false) }
@@ -231,7 +232,10 @@ fun AppNavHost(
     ) {
         composable(Routes.HOME) {
             HomeScreen(
-                onEntryClick = { navController.navigate(Routes.ENTRY) },
+                onEntryClick = {
+                    viewModel.setSelectedDate(LocalDate.now())
+                    navController.navigate(Routes.ENTRY)
+                },
                 onCalendarClick = { navController.navigate(Routes.CALENDAR) },
                 onEarningsClick = { navController.navigate(Routes.EARNINGS) },
                 onPaymentsClick = { navController.navigate(Routes.PAYMENTS) },
@@ -241,10 +245,11 @@ fun AppNavHost(
             )
         }
         composable(Routes.ENTRY) {
+            val selectedDate by viewModel.selectedDate.collectAsState()
             EntryScreen(
                 onBack = { navController.popBackStack() },
                 viewModel = viewModel,
-                date = LocalDate.now()
+                date = selectedDate
             )
         }
         composable(Routes.CALENDAR) {
