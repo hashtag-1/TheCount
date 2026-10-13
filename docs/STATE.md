@@ -30,6 +30,7 @@ The agent updates this after every task. Mark a task done only after the user ap
 - 5A-5C: Verified by user.
 - 6A: Implemented and verified on real device; marked done. Updated D13 to note nonce hash detail.
 - 6A wiring/error mapping adjustments as needed.
+- UI fix: Add payment moved from card 6 (Outstanding Balance) to a button on card 5 (Payments Received). Card 6 no longer clickable. Awaiting user test.
 
 ## Manual setup done by the user
 - [ ] Android Studio + base project created
