@@ -7,13 +7,18 @@ import java.time.LocalDate
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 
-class PaymentRepository(private val dao: PaymentDao) {
-    fun observeAll(userId: String): Flow<List<PaymentEntity>> = dao.observeAll(userId)
+class PaymentRepository(
+    private val dao: PaymentDao,
+    private val userProvider: CurrentUserProvider
+) {
+    private val userId: String = userProvider.currentUserId
 
-    fun sumPaymentsUntil(userId: String, endDate: LocalDate): Flow<BigDecimal> =
+    fun observeAll(): Flow<List<PaymentEntity>> = dao.observeAll(userId)
+
+    fun sumPaymentsUntil(endDate: LocalDate): Flow<BigDecimal> =
         dao.sumPaymentsUntil(userId, endDate)
 
-    suspend fun add(userId: String, paymentDate: LocalDate, amount: BigDecimal, note: String?): PaymentEntity {
+    suspend fun add(paymentDate: LocalDate, amount: BigDecimal, note: String?): PaymentEntity {
         val entity = PaymentEntity(
             userId = userId,
             paymentDate = paymentDate,
@@ -28,5 +33,5 @@ class PaymentRepository(private val dao: PaymentDao) {
         dao.update(entity.copy(updatedAt = System.currentTimeMillis(), syncState = "PENDING_UPSERT"))
     }
 
-    suspend fun softDelete(userId: String, id: UUID) = dao.softDeleteById(userId, id)
+    suspend fun softDelete(id: UUID) = dao.softDeleteById(userId, id)
 }

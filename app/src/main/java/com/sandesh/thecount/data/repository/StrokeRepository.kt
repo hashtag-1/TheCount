@@ -6,17 +6,22 @@ import com.sandesh.thecount.domain.WorkConfig
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 
-class StrokeRepository(private val dao: DailyStrokeDao) {
-    fun observeAll(userId: String): Flow<List<DailyStrokeEntity>> = dao.observeAll(userId)
+class StrokeRepository(
+    private val dao: DailyStrokeDao,
+    private val userProvider: CurrentUserProvider
+) {
+    private val userId: String = userProvider.currentUserId
 
-    fun sumStrokesUntil(userId: String, endDate: LocalDate): Flow<Long> =
+    fun observeAll(): Flow<List<DailyStrokeEntity>> = dao.observeAll(userId)
+
+    fun sumStrokesUntil(endDate: LocalDate): Flow<Long> =
         dao.sumStrokesUntil(userId, WorkConfig.START_DATE, endDate)
 
-    suspend fun getByDate(userId: String, date: LocalDate): DailyStrokeEntity? =
+    suspend fun getByDate(date: LocalDate): DailyStrokeEntity? =
         dao.getByDate(userId, date)
 
-    suspend fun saveOrUpdate(userId: String, workDate: LocalDate, strokeCount: Long): DailyStrokeEntity =
+    suspend fun saveOrUpdate(workDate: LocalDate, strokeCount: Long): DailyStrokeEntity =
         dao.upsertOrRevive(userId, workDate, strokeCount)
 
-    suspend fun softDelete(userId: String, workDate: LocalDate) = dao.softDelete(userId, workDate)
+    suspend fun softDelete(workDate: LocalDate) = dao.softDelete(userId, workDate)
 }

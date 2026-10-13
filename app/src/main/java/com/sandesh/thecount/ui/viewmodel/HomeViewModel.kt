@@ -2,6 +2,7 @@ package com.sandesh.thecount.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sandesh.thecount.data.repository.CurrentUserProvider
 import com.sandesh.thecount.data.repository.PaymentRepository
 import com.sandesh.thecount.data.repository.StrokeRepository
 import com.sandesh.thecount.domain.EarningsCalculator
@@ -32,21 +33,22 @@ data class HomeUiState(
 
 class HomeViewModel(
     private val strokeRepository: StrokeRepository,
-    private val paymentRepository: PaymentRepository? = null
+    private val paymentRepository: PaymentRepository? = null,
+    private val userProvider: CurrentUserProvider
 ) : ViewModel() {
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
 
-    private val userId = "local"
+    private val userId = userProvider.currentUserId
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
     val uiState: StateFlow<HomeUiState> = combine(
         _selectedDate,
-        strokeRepository.observeAll(userId),
-        strokeRepository.sumStrokesUntil(userId, LocalDate.now()),
-        paymentRepository?.observeAll(userId) ?: kotlinx.coroutines.flow.flowOf(emptyList()),
-        paymentRepository?.sumPaymentsUntil(userId, LocalDate.now()) ?: kotlinx.coroutines.flow.flowOf(BigDecimal.ZERO)
+        strokeRepository.observeAll(),
+        strokeRepository.sumStrokesUntil(LocalDate.now()),
+        paymentRepository?.observeAll() ?: kotlinx.coroutines.flow.flowOf(emptyList()),
+        paymentRepository?.sumPaymentsUntil(LocalDate.now()) ?: kotlinx.coroutines.flow.flowOf(BigDecimal.ZERO)
     ) { selectedDate, allStrokes, cumulative, payments, paymentsTotal ->
         val todayCount = allStrokes.find { it.workDate == LocalDate.now() && it.deletedAt == null }?.strokeCount
         val selectedCount = allStrokes.find { it.workDate == selectedDate && it.deletedAt == null }?.strokeCount
@@ -97,7 +99,7 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             try {
-                strokeRepository.saveOrUpdate(userId, date, countResult.getOrThrow())
+                strokeRepository.saveOrUpdate(date, countResult.getOrThrow())
                 _error.value = null
             } catch (e: Exception) {
                 _error.value = e.message
@@ -113,7 +115,7 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             try {
-                strokeRepository.softDelete(userId, date)
+                strokeRepository.softDelete(date)
                 _error.value = null
             } catch (e: Exception) {
                 _error.value = e.message
@@ -138,7 +140,7 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             try {
-                paymentRepository.add(userId, date, amountResult.getOrThrow(), note)
+                paymentRepository.add(date, amountResult.getOrThrow(), note)
                 _error.value = null
             } catch (e: Exception) {
                 _error.value = e.message
@@ -153,7 +155,7 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             try {
-                paymentRepository.softDelete(userId, id)
+                paymentRepository.softDelete(id)
                 _error.value = null
             } catch (e: Exception) {
                 _error.value = e.message

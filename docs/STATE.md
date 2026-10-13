@@ -15,6 +15,7 @@ The agent updates this after every task. Mark a task done only after the user ap
 | 6B | Session, access denied, account isolation | not started | |
 | 6B-1 | Session restore + encrypted session storage | written, not built (build done by user in Android Studio) | Added EncryptedSessionStorage (AES-256-GCM, Android Keystore), updated SupabaseProvider to initialize with it, TheCountApp now checks session at startup with loading indicator, starts at Home if valid session else Login. |
 | 6B-2 | Sign-out + account email display | written, not built (build done by user in Android Studio) | Settings: sign-out button with confirmation dialog, calls AuthRepository.signOut(), navigates to Login clearing back stack. Home & Settings show signed-in account email from session. No local data deleted (D10). |
+| 6B-3 | CurrentUserProvider refactor | written, not built (build and test by user in Android Studio) | New CurrentUserProvider interface + LocalUserProvider("local"). StrokeRepository, PaymentRepository, HomeViewModel, ViewModelFactory now read userId from provider. No behavior change. |
 | 7A | Sync foundation + push | not started | |
 | 7B | Pull, restore, conflicts, status UI | not started | |
 | 8 | Backup and recovery | not started | |
