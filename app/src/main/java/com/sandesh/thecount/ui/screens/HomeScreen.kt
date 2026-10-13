@@ -1,5 +1,6 @@
 package com.sandesh.thecount.ui.screens
 
+import io.github.jan.supabase.auth.auth
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,7 +29,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.sandesh.thecount.ui.sample.SampleData
+import androidx.compose.ui.unit.sp
+import com.sandesh.thecount.data.remote.SupabaseProvider
 import com.sandesh.thecount.ui.viewmodel.HomeViewModel
 import com.sandesh.thecount.util.MoneyFormat
 import java.text.NumberFormat
@@ -51,6 +53,8 @@ fun HomeScreen(
     val numberFormat = NumberFormat.getNumberInstance(Locale.US)
     val earnings = uiState.earnings
     val outstanding = earnings?.outstanding ?: BigDecimal.ZERO
+    val session = SupabaseProvider.client.auth.currentSessionOrNull()
+    val accountEmail = session?.user?.email ?: "Not signed in"
 
     Scaffold(
         topBar = {
@@ -79,8 +83,8 @@ fun HomeScreen(
                 ) {
                     Text(text = LocalDate.now().toString(), style = MaterialTheme.typography.bodyMedium)
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(text = SampleData.accountEmail, style = MaterialTheme.typography.bodySmall)
-                        Text(text = SampleData.syncStatus, style = MaterialTheme.typography.bodySmall)
+                        Text(text = accountEmail, style = MaterialTheme.typography.bodySmall)
+                        Text(text = "Synced", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }

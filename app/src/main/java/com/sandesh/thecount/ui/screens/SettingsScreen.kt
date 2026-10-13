@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,18 +28,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.sandesh.thecount.data.remote.SupabaseProvider
 import com.sandesh.thecount.data.repository.AuthRepository
 import io.github.jan.supabase.auth.auth
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onLoginClick: () -> Unit
+    onLoginClick: () -> Unit,
+    onSignOut: () -> Unit
 ) {
+    val context = LocalContext.current
+    val authRepository = remember { AuthRepository() }
     val session = SupabaseProvider.client.auth.currentSessionOrNull()
     val email = session?.user?.email
+    var showSignOutDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -72,11 +79,36 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.height(24.dp))
+                TextButton(onClick = { showSignOutDialog = true }) {
+                    Text("Sign out", fontSize = 16.sp)
+                }
             } else {
                 TextButton(onClick = onLoginClick) {
                     Text("Sign in with Google")
                 }
             }
         }
+    }
+
+    if (showSignOutDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignOutDialog = false },
+            title = { Text("Sign out?") },
+            text = { Text("Are you sure you want to sign out? Your local data will remain on this device.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSignOutDialog = false
+                    onSignOut()
+                }) {
+                    Text("Sign out")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

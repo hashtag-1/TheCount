@@ -13,6 +13,8 @@ The agent updates this after every task. Mark a task done only after the user ap
 | 5C | Backend verification (user runs SQL) | verified by user | User ran tests on real Supabase: registration_guard.sql passed 24/24 (failed 0), rls_isolation.sql passed 52/52 (failed 0). max_users restored to 120. |
 | 6A | Google OAuth config + Auth client | done | User tested on real phone: invited account signs in with profile in Supabase; uninvited blocked (access denied) with no profile; cancelling popup shows friendly message. Auth with nonce (raw to Supabase, SHA-256 hex to Google), tightened error mapping, logging. |
 | 6B | Session, access denied, account isolation | not started | |
+| 6B-1 | Session restore + encrypted session storage | written, not built (build done by user in Android Studio) | Added EncryptedSessionStorage (AES-256-GCM, Android Keystore), updated SupabaseProvider to initialize with it, TheCountApp now checks session at startup with loading indicator, starts at Home if valid session else Login. |
+| 6B-2 | Sign-out + account email display | written, not built (build done by user in Android Studio) | Settings: sign-out button with confirmation dialog, calls AuthRepository.signOut(), navigates to Login clearing back stack. Home & Settings show signed-in account email from session. No local data deleted (D10). |
 | 7A | Sync foundation + push | not started | |
 | 7B | Pull, restore, conflicts, status UI | not started | |
 | 8 | Backup and recovery | not started | |
