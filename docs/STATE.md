@@ -31,6 +31,8 @@ The agent updates this after every task. Mark a task done only after the user ap
 - 6A: Implemented and verified on real device; marked done. Updated D13 to note nonce hash detail.
 - 6A wiring/error mapping adjustments as needed.
 - UI fix: Add payment moved from card 6 (Outstanding Balance) to a button on card 5 (Payments Received). Card 6 no longer clickable. Awaiting user test.
+- UI theme applied (navy/orange). Awaiting user visual check.
+- UI: removed card number prefixes; removed 'Still owed' text. Awaiting user check.
 
 ## Manual setup done by the user
 - [ ] Android Studio + base project created
