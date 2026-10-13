@@ -20,8 +20,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -170,7 +172,9 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(text = MoneyFormat.format(uiState.paymentsTotalUpToSelected), style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = "+ Add payment", style = MaterialTheme.typography.bodySmall)
+                        OutlinedButton(onClick = onAddPaymentClick) {
+                            Text("+ Add payment", fontSize = 14.sp)
+                        }
                     }
                 }
             }
@@ -178,8 +182,7 @@ fun HomeScreen(
             item {
                 Card(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onAddPaymentClick() },
+                        .fillMaxWidth(),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
