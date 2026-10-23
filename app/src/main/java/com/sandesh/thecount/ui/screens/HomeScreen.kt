@@ -1,19 +1,19 @@
 package com.sandesh.thecount.ui.screens
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.border
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -24,28 +24,30 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sandesh.thecount.data.remote.SupabaseProvider
 import com.sandesh.thecount.data.repository.SyncRepository
 import com.sandesh.thecount.data.sync.SyncState
-import com.sandesh.thecount.ui.components.SyncChip
+import com.sandesh.thecount.ui.components.AppCard
+import com.sandesh.thecount.ui.components.InfoChip
+import com.sandesh.thecount.ui.components.LabelValue
+import com.sandesh.thecount.ui.theme.Spacing
 import com.sandesh.thecount.ui.viewmodel.HomeViewModel
 import com.sandesh.thecount.util.MoneyFormat
 import io.github.jan.supabase.auth.auth
+import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.util.Locale
-import java.math.BigDecimal
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,140 +67,112 @@ fun HomeScreen(
     val outstanding = earnings?.outstanding ?: BigDecimal.ZERO
     val session = SupabaseProvider.client.auth.currentSessionOrNull()
     val accountEmail = session?.user?.email ?: "Not signed in"
-
-    val syncState: SyncState = if (syncRepository == null) {
-        SyncState.Synced
-    } else {
-        syncRepository.syncState().collectAsStateWithLifecycle(initialValue = SyncState.Synced).value
-    }
+    val notSignedIn = session?.user?.email == null
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("TheCount", style = MaterialTheme.typography.titleLarge) },
+                title = { Text("TheCount", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary) },
                 navigationIcon = { IconButton(onClick = onSettingsClick) { Icon(Icons.Default.Settings, contentDescription = "Settings") } },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.primary
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.fillMaxSize().padding(padding).padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(horizontalAlignment = Alignment.Start) {
-                        Text(text = LocalDate.now().toString(), style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        SyncChip(state = syncState)
-                    }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = LocalDate.now().toString(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(text = accountEmail, style = MaterialTheme.typography.bodySmall)
-                        Text(text = "Synced", style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                            InfoChip(text = if (notSignedIn) "Not signed in" else accountEmail, tone = if (notSignedIn) com.sandesh.thecount.ui.components.ChipTone.Warning else com.sandesh.thecount.ui.components.ChipTone.Neutral)
+                            InfoChip(text = "Synced", tone = com.sandesh.thecount.ui.components.ChipTone.Positive)
+                        }
                     }
                 }
             }
-
-            item { StyledCard(onClick = onEntryClick) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Daily Entry (Today)", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = uiState.todayCount?.toString() ?: "No entry", style = MaterialTheme.typography.bodyMedium)
-                }
-            }}
-
-            item { StyledCard(onClick = onCalendarClick) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "History & Edit", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "${uiState.selectedDate}: ${uiState.selectedDateCount?.toString() ?: "No entry"}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }}
-
-            item { StyledCard() {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Cumulative Strokes", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = numberFormat.format(uiState.cumulativeStrokes), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-                }
-            }}
-
-            item { StyledCard(onClick = onEarningsClick) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Earnings", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = earnings?.net?.let { MoneyFormat.format(it) } ?: "-",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }}
-
-            item { StyledCard(onClick = onPaymentsClick) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Payments Received", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = MoneyFormat.format(uiState.paymentsTotalUpToSelected), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedButton(onClick = onAddPaymentClick) {
-                        Text("+ Add payment", style = MaterialTheme.typography.labelLarge)
+            item {
+                Card(onClick = onEarningsClick, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+                    Column(modifier = Modifier.padding(Spacing.lg)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "Earnings", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Spacer(modifier = Modifier.weight(1f))
+                            Icon(imageVector = Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                        Spacer(modifier = Modifier.height(Spacing.sm))
+                        Text(text = earnings?.net?.let { MoneyFormat.format(it) } ?: "-", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
                 }
-            }}
-
-            item { StyledCard() {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Outstanding Balance", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    val text: String
-                    val color: Color
-                    when {
-                        outstanding.signum() == 0 -> { text = MoneyFormat.format(outstanding) + " - Fully settled"; color = MaterialTheme.colorScheme.tertiary }
-                        outstanding.signum() < 0  -> { text = MoneyFormat.format(outstanding) + " - Overpaid / credit"; color = MaterialTheme.colorScheme.onSecondaryContainer }
-                        else                       -> { text = MoneyFormat.format(outstanding); color = MaterialTheme.colorScheme.onSurface }
+            }
+            item {
+                val fontScale = LocalDensity.current.fontScale
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val shouldStack = maxWidth < 360.dp || fontScale > 1.15f
+                    if (shouldStack) {
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                            AppCard(onClick = onPaymentsClick, modifier = Modifier.fillMaxWidth()) { LabelValue(label = "Payments Received", value = MoneyFormat.format(uiState.paymentsTotalUpToSelected), valueStyle = MaterialTheme.typography.headlineSmall) }
+                            AppCard(modifier = Modifier.fillMaxWidth()) {
+                                Column {
+                                    Text(text = "Outstanding Balance", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.height(Spacing.xs))
+                                    when {
+                                        outstanding.signum() == 0 -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface); Spacer(modifier = Modifier.height(Spacing.xs)); InfoChip(text = "Fully settled", tone = com.sandesh.thecount.ui.components.ChipTone.Positive) }
+                                        outstanding.signum() < 0 -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface); Spacer(modifier = Modifier.height(Spacing.xs)); InfoChip(text = "Overpaid / credit", tone = com.sandesh.thecount.ui.components.ChipTone.Neutral) }
+                                        else -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface) }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                            AppCard(onClick = onPaymentsClick, modifier = Modifier.weight(1f).fillMaxHeight()) { LabelValue(label = "Payments Received", value = MoneyFormat.format(uiState.paymentsTotalUpToSelected), valueStyle = MaterialTheme.typography.headlineSmall) }
+                            AppCard(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                                Column {
+                                    Text(text = "Outstanding Balance", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.height(Spacing.xs))
+                                    when {
+                                        outstanding.signum() == 0 -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface); Spacer(modifier = Modifier.height(Spacing.xs)); InfoChip(text = "Fully settled", tone = com.sandesh.thecount.ui.components.ChipTone.Positive) }
+                                        outstanding.signum() < 0 -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface); Spacer(modifier = Modifier.height(Spacing.xs)); InfoChip(text = "Overpaid / credit", tone = com.sandesh.thecount.ui.components.ChipTone.Neutral) }
+                                        else -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface) }
+                                    }
+                                }
+                            }
+                        }
                     }
-                    Text(
-                        text = text,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = color
-                    )
                 }
-            }}
+            }
+            item {
+                OutlinedButton(onClick = onAddPaymentClick, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("+ Add payment") }
+            }
+            item {
+                AppCard(modifier = Modifier.fillMaxWidth()) { LabelValue(label = "Cumulative Strokes", value = numberFormat.format(uiState.cumulativeStrokes), valueStyle = MaterialTheme.typography.headlineMedium, valueColor = MaterialTheme.colorScheme.primary) }
+            }
+            item {
+                AppCard(onClick = onEntryClick, modifier = Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Daily Entry (Today)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.height(Spacing.xs))
+                            Text(text = uiState.todayCount?.toString() ?: "No entry", style = if (uiState.todayCount != null) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.bodyLarge, color = if (uiState.todayCount != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(imageVector = Icons.Filled.KeyboardArrowRight, contentDescription = null)
+                    }
+                }
+            }
+            item {
+                AppCard(onClick = onCalendarClick, modifier = Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "History & Edit", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.height(Spacing.xs))
+                            Text(text = "${uiState.selectedDate}: ${uiState.selectedDateCount?.toString() ?: "No entry"}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                        Icon(imageVector = Icons.Filled.KeyboardArrowRight, contentDescription = null)
+                    }
+                }
+            }
         }
-    }
-}
-
-@Composable
-private fun StyledCard(
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-    content: @Composable () -> Unit
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(onClick?.let { Modifier.clickable(onClick = it) } ?: Modifier),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        content()
     }
 }
