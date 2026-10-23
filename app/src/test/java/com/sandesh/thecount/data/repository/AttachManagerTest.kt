@@ -1,106 +1,102 @@
+
 package com.sandesh.thecount.data.repository
 
-import com.sandesh.thecount.data.db.DailyStrokeDao
-import com.sandesh.thecount.data.db.PaymentDao
-import com.sandesh.thecount.data.db.PaymentEntity
-import com.sandesh.thecount.data.db.DailyStrokeEntity
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runBlockingTest
-import org.junit.Assert
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.mockito.Mock
 import org.mockito.Mockito
-import org.mockito.MockitoAnnotations
-import java.math.BigDecimal
+
 import java.time.LocalDate
-import java.util.UUID
 
 class AttachManagerTest {
 
-    @Mock
-    lateinit var strokeDao: DailyStrokeDao
-
-    @Mock
-    lateinit var paymentDao: PaymentDao
-
-    @Mock
-    lateinit var strokeRepository: StrokeRepository
-
-    @Mock
-    lateinit var paymentRepository: PaymentRepository
-
-    @Mock
-    lateinit var userProvider: CurrentUserProvider
-
+    private lateinit var strokeRepository: StrokeRepository
+    private lateinit var paymentRepository: PaymentRepository
     private lateinit var attachManager: AttachManager
 
     @Before
     fun setup() {
-        MockitoAnnotations.openMocks(this)
+        strokeRepository = Mockito.mock(StrokeRepository::class.java)
+        paymentRepository = Mockito.mock(PaymentRepository::class.java)
         attachManager = AttachManager(strokeRepository, paymentRepository)
     }
 
     @Test
-    fun `no local data returns NoLocalData`() = runBlockingTest {
+    fun `no local data returns NoLocalData`() = runTest {
         Mockito.`when`(strokeRepository.countLocalStrokes()).thenReturn(0)
         Mockito.`when`(paymentRepository.countLocalPayments()).thenReturn(0)
 
         val result = attachManager.tryAttach("user-123")
 
-        Assert.assertTrue(result is AttachResult.NoLocalData)
+        assertTrue(result is AttachResult.NoLocalData)
     }
 
     @Test
-    fun `local data attached successfully returns Attached`() = runBlockingTest {
+    fun `local data attached successfully returns Attached`() = runTest {
+        val dates = listOf(
+            LocalDate.parse("2026-09-02"),
+            LocalDate.parse("2026-09-03")
+        )
+
         Mockito.`when`(strokeRepository.countLocalStrokes()).thenReturn(3)
         Mockito.`when`(paymentRepository.countLocalPayments()).thenReturn(2)
-        Mockito.`when`(strokeRepository.getLocalStrokeDates())
-            .thenReturn(listOf(LocalDate.parse("2026-09-02"), LocalDate.parse("2026-09-03")))
-        Mockito.`when`(strokeRepository.getClashingDates("user-123", any()))
-            .thenReturn(emptyList())
-        Mockito.`when`(strokeRepository.attachLocalToUser("user-123", any()))
-            .thenReturn(3)
-        Mockito.`when`(paymentRepository.attachLocalPaymentsToUser("user-123"))
-            .thenReturn(2)
+        Mockito.`when`(strokeRepository.getLocalStrokeDates()).thenReturn(dates)
+        Mockito.`when`(
+            strokeRepository.getClashingDates("user-123", dates)
+        ).thenReturn(emptyList())
+        Mockito.`when`(
+            strokeRepository.attachLocalToUser("user-123", dates)
+        ).thenReturn(3)
+        Mockito.`when`(
+            paymentRepository.attachLocalPaymentsToUser("user-123")
+        ).thenReturn(2)
 
         val result = attachManager.tryAttach("user-123")
 
-        Assert.assertTrue(result is AttachResult.Attached)
+        assertTrue(result is AttachResult.Attached)
+
         val attached = result as AttachResult.Attached
-        Assert.assertEquals(3, attached.strokeCount)
-        Assert.assertEquals(2, attached.paymentCount)
+        assertEquals(3, attached.strokeCount)
+        assertEquals(2, attached.paymentCount)
     }
 
     @Test
-    fun `date clash returns Clash with clashing dates`() = runBlockingTest {
+    fun `date clash returns Clash with clashing dates`() = runTest {
         val clashDate = LocalDate.parse("2026-09-02")
+
         Mockito.`when`(strokeRepository.countLocalStrokes()).thenReturn(1)
         Mockito.`when`(paymentRepository.countLocalPayments()).thenReturn(0)
         Mockito.`when`(strokeRepository.getLocalStrokeDates())
             .thenReturn(listOf(clashDate))
-        Mockito.`when`(strokeRepository.getClashingDates("user-123", listOf(clashDate)))
-            .thenReturn(listOf(clashDate))
+        Mockito.`when`(
+            strokeRepository.getClashingDates("user-123", listOf(clashDate))
+        ).thenReturn(listOf(clashDate))
 
         val result = attachManager.tryAttach("user-123")
 
-        Assert.assertTrue(result is AttachResult.Clash)
-        val clash = result as AttachResult.Clash
-        Assert.assertEquals(listOf(clashDate), clash.clashingDates)
+        assertTrue(result is AttachResult.Clash)
+        assertEquals(
+            listOf(clashDate),
+            (result as AttachResult.Clash).clashingDates
+        )
     }
 
     @Test
-    fun `local data but target user already has all dates - returns Clash`() = runBlockingTest {
+    fun `local data but target user already has all dates - returns Clash`() = runTest {
         val existingDate = LocalDate.parse("2026-09-02")
+
         Mockito.`when`(strokeRepository.countLocalStrokes()).thenReturn(1)
         Mockito.`when`(paymentRepository.countLocalPayments()).thenReturn(0)
         Mockito.`when`(strokeRepository.getLocalStrokeDates())
             .thenReturn(listOf(existingDate))
-        Mockito.`when`(strokeRepository.getClashingDates("user-123", listOf(existingDate)))
-            .thenReturn(listOf(existingDate))
+        Mockito.`when`(
+            strokeRepository.getClashingDates("user-123", listOf(existingDate))
+        ).thenReturn(listOf(existingDate))
 
         val result = attachManager.tryAttach("user-123")
 
-        Assert.assertTrue(result is AttachResult.Clash)
+        assertTrue(result is AttachResult.Clash)
     }
 }

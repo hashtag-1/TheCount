@@ -1,3 +1,4 @@
+
 import java.util.Properties
 
 plugins {
@@ -52,13 +53,16 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     kotlinOptions {
         jvmTarget = "11"
     }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -80,26 +84,32 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.androidx.navigation.compose)
+
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    // Supabase + Auth + Google sign-in (Credential Manager with nonce)
+    // Supabase, authentication, and Google sign-in
     implementation(platform(libs.supabase.bom))
     implementation(libs.supabase.auth)
     implementation(libs.supabase.postgrest)
-    implementation(libs.ktor.client.okhttp) // HTTP engine that supabase-kt needs (Ktor 3.0.3, same as supabase-kt 3.1.1)
+    implementation(libs.ktor.client.okhttp)
     implementation(libs.androidx.credentials)
-implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
     implementation(libs.kotlinx.serialization)
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Unit testing
     testImplementation(libs.junit)
+    testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
+
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }

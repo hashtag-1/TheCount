@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DailyStrokeDao {
+
     @Query("SELECT * FROM daily_strokes WHERE user_id = :userId AND deleted_at IS NULL ORDER BY work_date DESC")
     fun observeAll(userId: String): Flow<List<DailyStrokeEntity>>
 
@@ -24,9 +25,29 @@ interface DailyStrokeDao {
     @Update
     suspend fun update(entity: DailyStrokeEntity)
 
+    // Backup and recovery
+
+    @Query("""
+        SELECT * FROM daily_strokes
+        WHERE user_id = :userId AND deleted_at IS NULL
+        ORDER BY work_date ASC
+    """)
+    suspend fun getBackupStrokes(userId: String): List<DailyStrokeEntity>
+
+    @Query("""
+        SELECT * FROM daily_strokes
+        WHERE user_id = :userId
+    """)
+    suspend fun getAllStrokesForBackup(userId: String): List<DailyStrokeEntity>
+
     @Transaction
-    suspend fun upsertOrRevive(userId: String, workDate: LocalDate, strokeCount: Long): DailyStrokeEntity {
+    suspend fun upsertOrRevive(
+        userId: String,
+        workDate: LocalDate,
+        strokeCount: Long
+    ): DailyStrokeEntity {
         val existing = getByDate(userId, workDate)
+
         return if (existing == null) {
             val newEntity = DailyStrokeEntity(
                 userId = userId,
@@ -48,27 +69,64 @@ interface DailyStrokeDao {
         }
     }
 
-    @Query("UPDATE daily_strokes SET deleted_at = :deletedAt, sync_state = 'PENDING_DELETE', updated_at = :deletedAt WHERE user_id = :userId AND work_date = :workDate AND deleted_at IS NULL")
-    suspend fun softDelete(userId: String, workDate: LocalDate, deletedAt: Long = System.currentTimeMillis())
+    @Query("""
+        UPDATE daily_strokes
+        SET deleted_at = :deletedAt,
+            sync_state = 'PENDING_DELETE',
+            updated_at = :deletedAt
+        WHERE user_id = :userId
+          AND work_date = :workDate
+          AND deleted_at IS NULL
+    """)
+    suspend fun softDelete(
+        userId: String,
+        workDate: LocalDate,
+        deletedAt: Long = System.currentTimeMillis()
+    )
 
-    @Query("SELECT COALESCE(SUM(stroke_count), 0) FROM daily_strokes WHERE user_id = :userId AND deleted_at IS NULL AND work_date >= :startDate AND work_date <= :endDate")
-    fun sumStrokesUntil(userId: String, startDate: LocalDate, endDate: LocalDate): Flow<Long>
+    @Query("""
+        SELECT COALESCE(SUM(stroke_count), 0)
+        FROM daily_strokes
+        WHERE user_id = :userId
+          AND deleted_at IS NULL
+          AND work_date >= :startDate
+          AND work_date <= :endDate
+    """)
+    fun sumStrokesUntil(
+        userId: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Flow<Long>
 
-    // Attach logic
+    // Attach local data to a user
+
     @Query("SELECT COUNT(*) FROM daily_strokes WHERE user_id = 'local' AND deleted_at IS NULL")
     suspend fun countLocalStrokes(): Int
 
     @Query("SELECT work_date FROM daily_strokes WHERE user_id = 'local' AND deleted_at IS NULL")
     suspend fun getLocalStrokeDates(): List<LocalDate>
 
-    @Query("SELECT work_date FROM daily_strokes WHERE user_id = :targetUserId AND work_date IN (:dates) AND deleted_at IS NULL")
-    suspend fun getClashingDates(targetUserId: String, dates: List<LocalDate>): List<LocalDate>
+    @Query("""
+        SELECT work_date FROM daily_strokes
+        WHERE user_id = :targetUserId
+          AND work_date IN (:dates)
+          AND deleted_at IS NULL
+    """)
+    suspend fun getClashingDates(
+        targetUserId: String,
+        dates: List<LocalDate>
+    ): List<LocalDate>
 
     @Transaction
-    suspend fun attachLocalToUser(targetUserId: String, dates: List<LocalDate>): Int {
+    suspend fun attachLocalToUser(
+        targetUserId: String,
+        dates: List<LocalDate>
+    ): Int {
         var updated = 0
+
         for (date in dates) {
             val entity = getByDate("local", date)
+
             if (entity != null) {
                 val updatedEntity = entity.copy(
                     userId = targetUserId,
@@ -79,36 +137,81 @@ interface DailyStrokeDao {
                 updated++
             }
         }
+
         return updated
     }
 
-    // ---- Sync (Task 7A) ----
+    // Sync
 
-    /** Every row that still needs to go to the server, ordered oldest-first. */
-    @Query("SELECT * FROM daily_strokes WHERE user_id = :userId AND sync_state IN ('PENDING_UPSERT', 'PENDING_DELETE') ORDER BY updated_at ASC")
+    /** Rows waiting to be sent to the server, oldest first. */
+    @Query("""
+        SELECT * FROM daily_strokes
+        WHERE user_id = :userId
+          AND sync_state IN ('PENDING_UPSERT', 'PENDING_DELETE')
+        ORDER BY updated_at ASC
+    """)
     suspend fun getPending(userId: String): List<DailyStrokeEntity>
 
-    /** One row by id, for resolving a conflict against the server's current values. */
+    /** Find a row by its ID. */
     @Query("SELECT * FROM daily_strokes WHERE user_id = :userId AND id = :id")
     suspend fun getById(userId: String, id: UUID): DailyStrokeEntity?
 
     /** Mark a row as synced with the server-assigned version. */
-    @Query("UPDATE daily_strokes SET sync_state = 'SYNCED', server_version = :version, updated_at = :now WHERE user_id = :userId AND id = :id")
-    suspend fun markSynced(userId: String, id: UUID, version: Long, now: Long = System.currentTimeMillis())
+    @Query("""
+        UPDATE daily_strokes
+        SET sync_state = 'SYNCED',
+            server_version = :version,
+            updated_at = :now
+        WHERE user_id = :userId AND id = :id
+    """)
+    suspend fun markSynced(
+        userId: String,
+        id: UUID,
+        version: Long,
+        now: Long = System.currentTimeMillis()
+    )
 
-    /** Mark a row as in conflict, keeping the client's version for the user to resolve later. */
-    @Query("UPDATE daily_strokes SET sync_state = 'CONFLICT', updated_at = :now WHERE user_id = :userId AND id = :id")
-    suspend fun markConflict(userId: String, id: UUID, now: Long = System.currentTimeMillis())
+    /** Mark a row as conflicted. */
+    @Query("""
+        UPDATE daily_strokes
+        SET sync_state = 'CONFLICT', updated_at = :now
+        WHERE user_id = :userId AND id = :id
+    """)
+    suspend fun markConflict(
+        userId: String,
+        id: UUID,
+        now: Long = System.currentTimeMillis()
+    )
 
-    /** Mark a row as an error (permanent Postgres rejection). Cleared by the next successful push. */
-    @Query("UPDATE daily_strokes SET sync_state = 'ERROR', updated_at = :now WHERE user_id = :userId AND id = :id")
-    suspend fun markError(userId: String, id: UUID, now: Long = System.currentTimeMillis())
+    /** Mark a row as having a permanent server error. */
+    @Query("""
+        UPDATE daily_strokes
+        SET sync_state = 'ERROR', updated_at = :now
+        WHERE user_id = :userId AND id = :id
+    """)
+    suspend fun markError(
+        userId: String,
+        id: UUID,
+        now: Long = System.currentTimeMillis()
+    )
 
-    /** Reset a row back to pending so the worker retries it. */
-    @Query("UPDATE daily_strokes SET sync_state = 'PENDING_UPSERT', updated_at = :now WHERE user_id = :userId AND id = :id")
-    suspend fun markPending(userId: String, id: UUID, now: Long = System.currentTimeMillis())
+    /** Reset a row so it can be retried. */
+    @Query("""
+        UPDATE daily_strokes
+        SET sync_state = 'PENDING_UPSERT', updated_at = :now
+        WHERE user_id = :userId AND id = :id
+    """)
+    suspend fun markPending(
+        userId: String,
+        id: UUID,
+        now: Long = System.currentTimeMillis()
+    )
 
-    /** Live count of rows still waiting on the server. */
-    @Query("SELECT COUNT(*) FROM daily_strokes WHERE user_id = :userId AND sync_state IN ('PENDING_UPSERT', 'PENDING_DELETE')")
-    fun observePendingCount(userId: String): kotlinx.coroutines.flow.Flow<Int>
+    /** Observe the number of rows waiting to sync. */
+    @Query("""
+        SELECT COUNT(*) FROM daily_strokes
+        WHERE user_id = :userId
+          AND sync_state IN ('PENDING_UPSERT', 'PENDING_DELETE')
+    """)
+    fun observePendingCount(userId: String): Flow<Int>
 }
