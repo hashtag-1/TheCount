@@ -214,4 +214,12 @@ interface DailyStrokeDao {
           AND sync_state IN ('PENDING_UPSERT', 'PENDING_DELETE')
     """)
     fun observePendingCount(userId: String): Flow<Int>
+
+     /** Ids of rows the phone believes are already on the server. */
+    @Query("SELECT id FROM daily_strokes WHERE user_id = :userId AND sync_state = 'SYNCED'")
+    suspend fun getSyncedIds(userId: String): List<UUID>
+
+    /** Permanently removes one local row. Used only when the server no longer has it. */
+    @Query("DELETE FROM daily_strokes WHERE user_id = :userId AND id = :id")
+    suspend fun hardDelete(userId: String, id: UUID)
 }

@@ -27,7 +27,7 @@ The agent updates this after every task. Mark a task done only after the user ap
 | 7A-2b | Sync push implementation (WorkManager + SyncManager + SyncChip) | **built and exercised by user on phone** | SyncScheduler schedules periodic 15-min push with network constraint + exponential backoff. SyncManager pushes every PENDING_UPSERT/PENDING_DELETE row via the two push functions; Ok → SYNCED with server version, Conflict → CONFLICT, PermanentError → ERROR, network → retry. SyncChip on Home shows Synced / N pending / Error / Offline. "Sync now" button in Settings triggers one-off push. |
 | 7B | Pull (Supabase → local Room DB) | PARTIAL: pull/restore built and exercised by user on phone; conflict screen, sign-out wipe and version-cursor paging NOT built | Pull downloads ALL rows each time (no lastPulledVersion cursor, no paging). Open vs prompts.md 7B: item 1 (cursor + mark CONFLICT instead of skipping pending rows), item 4 (conflict screen), item 5 (sign-out wipe, D10), item 7 (pure-logic tests). |
 | 8 | Backup and recovery | built; gaps closed by BackupRules refactor + tests | BackupManager (SAF export, OpenDocument import), BackupRules, Settings UI (Export/Import, MERGE or REPLACE, typed REPLACE confirmation, account-mismatch confirmation), docs/BACKUP.md. User's real export checked: checksum valid, 36 strokes (2026-09-02 to 2026-10-14), 0 payments, no duplicate dates. Payment export/import NOT exercised with real data. BackupRulesTest.kt is an EMPTY file, no backup unit tests exist. |
-| 9 | Final validation + release APK | not started | Do after the Task 8 gaps and 7B leftovers are closed or knowingly accepted. |
+| 9 | Final validation + release APK | written, build OK, tests passed, not verified by user | Do after the Task 8 gaps and 7B leftovers are closed or knowingly accepted. |
 | UI-1 | Settings final UI pass + Hide Currency (Home) + Working Days (Settings) | verified by user | Not in prompts.md (extra work). |
 
 ## Log
@@ -71,6 +71,7 @@ Other: no unit tests for payment validators; UI-1 not verified by user.
 
 ## Manual steps for the user (from Task 6A)
 - If Google sign-in fails in release, ensure release SHA-1 is registered in Google Cloud OAuth client for Android.
+
 
 
 

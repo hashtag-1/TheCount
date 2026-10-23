@@ -1,0 +1,3 @@
+Invitation Query:   
+
+insert into public.invitations (email) values (lower('sun.desh.cs1@gmail.com'));

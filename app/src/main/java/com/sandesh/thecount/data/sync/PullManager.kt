@@ -24,6 +24,13 @@ import java.util.UUID
  *      · server alive    → update fields, mark SYNCED, clear deletedAt.
  *  - Row exists locally but server version is NOT newer     → nothing (already up to date).
  *
+ * A server row is "deleted" when its deleted_at column is not null.
+ *
+ * Removal rule: a local row that is SYNCED (the phone believes it is on the server) but is
+ * missing from the server's answer was removed from the database directly, so it is removed
+ * from the phone too. Pending, conflict and error rows are never removed this way. If the
+ * server returns no rows at all, nothing is removed (a safety net against a bad empty answer).
+ *
  * Network errors are rethrown so SyncWorker retries. Decode errors are logged and skipped.
  */
 class PullManager(
@@ -40,7 +47,7 @@ class PullManager(
 
     /**
      * Pulls all rows from the server and merges them into Room.
-     * Returns the number of rows that were inserted or updated locally.
+     * Returns the number of rows that were inserted, updated or removed locally.
      * Throws on network error (caller retries).
      */
     suspend fun pullAll(): Int {
@@ -89,7 +96,7 @@ class PullManager(
                     val serverNewer = dto.version > (existing.serverVersion ?: -1L)
                     if (serverNewer) {
                         val now = System.currentTimeMillis()
-                        if (dto.deletedAt == null) {
+                        if (dto.deletedAt != null) {
                             db.dailyStrokeDao().update(
                                 existing.copy(
                                     deletedAt = now,
@@ -116,6 +123,17 @@ class PullManager(
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "PullManager: skipping stroke ${dto.id}: ${e.message}")
+            }
+        }
+
+        // Remove synced local strokes that no longer exist on the server.
+        if (strokes.isNotEmpty()) {
+            val serverStrokeIds = strokes.mapNotNull { runCatching { UUID.fromString(it.id) }.getOrNull() }.toSet()
+            for (localId in db.dailyStrokeDao().getSyncedIds(userId)) {
+                if (localId !in serverStrokeIds) {
+                    db.dailyStrokeDao().hardDelete(userId, localId)
+                    merged++
+                }
             }
         }
 
@@ -186,6 +204,17 @@ class PullManager(
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "PullManager: skipping payment ${dto.id}: ${e.message}")
+            }
+        }
+
+        // Remove synced local payments that no longer exist on the server.
+        if (payments.isNotEmpty()) {
+            val serverPaymentIds = payments.mapNotNull { runCatching { UUID.fromString(it.id) }.getOrNull() }.toSet()
+            for (localId in db.paymentDao().getSyncedIds(userId)) {
+                if (localId !in serverPaymentIds) {
+                    db.paymentDao().hardDelete(userId, localId)
+                    merged++
+                }
             }
         }
 
