@@ -1,3 +1,4 @@
+
 package com.sandesh.thecount.data.sync
 
 import android.content.Context
@@ -7,74 +8,57 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkRequest
 import java.util.concurrent.TimeUnit
 
-/**
- * Schedules the push worker. Called once at app start (MainActivity) and again after every
- * successful push so the backoff clock is reset. Pull (7B) is scheduled separately.
- *
- * The work is periodic so a row that was PENDING when the app was killed still gets pushed
- * when the phone wakes up and has network.
- */
 object SyncScheduler {
 
     private const val TAG = "TheCountSync"
+    private const val PERIODIC_WORK = "thecount-sync-push"
+    private const val IMMEDIATE_WORK = "thecount-sync-now"
 
-    /** Every 15 minutes at minimum, when the phone has any network. */
     private val constraints = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
         .build()
 
+    // Periodic background sync, at the minimum 15-minute interval.
     fun schedule(context: Context) {
-        val request: PeriodicWorkRequest =
-            PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
-                .setConstraints(constraints)
-                .setBackoffCriteria(
-                    BackoffPolicy.EXPONENTIAL,
-                    WorkRequest.MIN_BACKOFF_MILLIS,
-                    TimeUnit.MILLISECONDS
-                )
-                .addTag(TAG)
-                .build()
+        val request = PeriodicWorkRequestBuilder<SyncWorker>(
+            15, TimeUnit.MINUTES
+        )
+            .setConstraints(constraints)
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                WorkRequest.MIN_BACKOFF_MILLIS,
+                TimeUnit.MILLISECONDS
+            )
+            .addTag(TAG)
+            .build()
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            SyncWorker.UNIQUE_WORK_NAME,
+            PERIODIC_WORK,
             ExistingPeriodicWorkPolicy.KEEP,
             request
         )
     }
 
-    /** Reset the backoff clock after a successful push. */
-    fun resetBackoff(context: Context) {
-        val request: PeriodicWorkRequest =
-            PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
-                .setConstraints(constraints)
-                .addTag(TAG)
-                .build()
-
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            SyncWorker.UNIQUE_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            request
-        )
-    }
-
-    /** One-off push right now, used by the "Sync now" button in Settings. */
+    // Request a sync immediately after login or when the user taps Sync.
     fun syncNow(context: Context) {
-        // enqueueUniqueWork requires OneTimeWorkRequest, not PeriodicWorkRequest.
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(constraints)
             .addTag(TAG)
             .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
-            SyncWorker.UNIQUE_WORK_NAME,
+            IMMEDIATE_WORK,
             ExistingWorkPolicy.REPLACE,
             request
         )
+    }
+
+    fun resetBackoff(context: Context) {
+        schedule(context)
     }
 }

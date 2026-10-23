@@ -36,9 +36,11 @@ class StrokePuller {
 
         try {
             pullJson.decodeFromString<List<StrokeRowDto>>(result.data)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Log.e("TheCountSync", "StrokePuller: failed to decode response: ${e.message}")
-            emptyList()
+            Log.e("TheCountSync", "Stroke download decoding failed", e)
+            throw IllegalStateException("Failed to decode strokes from Supabase", e)
         }
     }
 }
@@ -61,9 +63,11 @@ class PaymentPuller {
 
         try {
             pullJson.decodeFromString<List<PaymentRowDto>>(result.data)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Log.e("TheCountSync", "PaymentPuller: failed to decode response: ${e.message}")
-            emptyList()
+            Log.e("TheCountSync", "Payment download decoding failed", e)
+            throw IllegalStateException("Failed to decode payments from Supabase", e)
         }
     }
 }

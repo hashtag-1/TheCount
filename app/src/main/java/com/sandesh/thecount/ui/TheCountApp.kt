@@ -1,5 +1,6 @@
 package com.sandesh.thecount.ui
 
+import com.sandesh.thecount.data.sync.SyncScheduler
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.CircularProgressIndicator
@@ -79,6 +80,11 @@ fun TheCountApp() {
         val session = authRepository.currentSession()
         val userId = session?.user?.id
         hasValidSession = session != null
+
+        if (userId != null) {
+            SyncScheduler.schedule(context.applicationContext)
+            SyncScheduler.syncNow(context.applicationContext)
+        }
 
         if (userId != null && !userProvider.wasPromptedForAccount(userId)) {
             val localStrokes = strokeRepository.countLocalStrokes()
