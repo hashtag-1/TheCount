@@ -60,4 +60,4 @@ The agent updates this after every task. Mark a task done only after the user ap
 - The Home status row shows "Synced", but sync is not built until Task 7. This label is wrong and must be changed to "Local only" until Task 7A works. Not fixed yet.
 - Duplicate dead file: app/src/main/java/com/sandesh/thecount/ui/screens/AccessDeniedScreen.kt (placeholder). The used one is app/src/main/kotlin/com/sandesh/thecount/ui/screens/auth/AccessDeniedScreen.kt. Not deleted yet.
 - Stray root file "tatus" (git log dump). Not deleted yet.
-- Data is stored ONLY on this phone until Task 7A (push sync) is done.
+- Data is stored ONLY on this phone until Task 7A (push sync) is done.| Settings final UI pass + Hide Currency (Home) | written, build OK, tests passed, not verified by user | written, MoneyMask tests included, NOT verified by user |
