@@ -134,7 +134,7 @@ class PullManager(
             try {
                 val id = UUID.fromString(dto.id)
                 val existing: PaymentEntity? = db.paymentDao().getById(userId, id)
-                val serverAmount = BigDecimal(dto.amount).setScale(2, RoundingMode.HALF_UP)
+                val serverAmount = BigDecimal(dto.amount.content).setScale(2, RoundingMode.HALF_UP)
 
                 if (existing == null) {
                     if (!dto.deleted) {

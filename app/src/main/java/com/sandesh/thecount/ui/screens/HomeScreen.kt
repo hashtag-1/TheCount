@@ -1,7 +1,7 @@
 package com.sandesh.thecount.ui.screens
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.collectAsState
-
+import kotlinx.coroutines.flow.flowOf
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -79,6 +79,10 @@ fun HomeScreen(
     val session = SupabaseProvider.client.auth.currentSessionOrNull()
     val accountEmail = session?.user?.email ?: "Not signed in"
     val notSignedIn = session?.user?.email == null
+    val syncFlow = remember(syncRepository) {
+        syncRepository?.syncState() ?: flowOf<SyncState>(SyncState.Synced)
+    }
+    val syncState by syncFlow.collectAsStateWithLifecycle(initialValue = SyncState.Synced)
 
     Scaffold(
         topBar = {
@@ -99,7 +103,21 @@ fun HomeScreen(
                     Column(horizontalAlignment = Alignment.End) {
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                             InfoChip(text = if (notSignedIn) "Not signed in" else accountEmail, tone = if (notSignedIn) com.sandesh.thecount.ui.components.ChipTone.Warning else com.sandesh.thecount.ui.components.ChipTone.Neutral)
-                            InfoChip(text = "Synced", tone = com.sandesh.thecount.ui.components.ChipTone.Positive)
+                            val state = syncState
+                            InfoChip(
+                                text = when (state) {
+                                    is SyncState.Synced -> "Synced"
+                                    is SyncState.Pending -> "${state.count} pending"
+                                    is SyncState.Error -> "Sync error"
+                                    is SyncState.Offline -> "Offline"
+                                },
+                                tone = when (state) {
+                                    is SyncState.Synced -> com.sandesh.thecount.ui.components.ChipTone.Positive
+                                    is SyncState.Pending -> com.sandesh.thecount.ui.components.ChipTone.Warning
+                                    is SyncState.Error -> com.sandesh.thecount.ui.components.ChipTone.Error
+                                    is SyncState.Offline -> com.sandesh.thecount.ui.components.ChipTone.Neutral
+                                }
+                            )
                         }
                     }
                 }

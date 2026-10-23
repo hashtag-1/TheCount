@@ -2,6 +2,7 @@ package com.sandesh.thecount.data.remote.dto
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * A single row returned by SELECT on the daily_strokes table.
@@ -25,7 +26,7 @@ data class StrokeRowDto(
 data class PaymentRowDto(
     val id: String,
     @SerialName("payment_date") val paymentDate: String,
-    val amount: String,
+    val amount: JsonPrimitive,
     val note: String? = null,
     val deleted: Boolean = false,
     val version: Long

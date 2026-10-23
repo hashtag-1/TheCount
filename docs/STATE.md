@@ -21,13 +21,14 @@ The agent updates this after every task. Mark a task done only after the user ap
 | 6B-4c | Account isolation fix | built and exercised by user on phone as part of 6B-4 | HomeViewModel and repositories now follow userId Flow with flatMapLatest. TheCountApp keys HomeViewModel by userId so new user gets fresh instance. Second account starts empty, first intact. |
 | 6B-4 | Attach prompt, per-user isolation, account switching | **written and tested by user on phone** | Attach prompt appears on first sign-in with local data. Second account starts empty. First account's data intact. Sign-out → sign-in as different account works without app restart. |
 | 6B-5 | Session & profile validity | done (verified by user on phone) | SessionUserProvider: 10s timeout on Refreshing/Restoring → treats as signed out. AuthRepository.checkProfileStatus() queries profiles table; if missing/inactive → navigates to AccessDenied (no local data changed). Offline: ProfileStatus.Error keeps user on Home. |
-| 6 | Settings screen fix | done (verified by user on phone) | Fixed broken `AndroidDialog` import → `AlertDialog` in SettingsScreen.kt. Build passes. |
+| 6 | Settings screen fix | done (verified by user on phone) | Fixed broken `AndroidDialog` import → `AlertDialog` in SettingsScreen.kt. Build passes. Verified by user on phone. |
 | 7A-1 | Sync push functions + SQL tests | verified by user (40/40 passed) | |
-| 7A-2a | SyncPushResult + DTOs + parsePushResponse | written, 30 tests passed, not verified by user | |
+| 7A-2a | SyncPushResult + DTOs + parsePushResponse | done (30 unit tests pass; exercised on phone through 7A-2b) | |
 | 7A-2b | Sync push implementation (WorkManager + SyncManager + SyncChip) | **built and exercised by user on phone** | SyncScheduler schedules periodic 15-min push with network constraint + exponential backoff. SyncManager pushes every PENDING_UPSERT/PENDING_DELETE row via the two push functions; Ok → SYNCED with server version, Conflict → CONFLICT, PermanentError → ERROR, network → retry. SyncChip on Home shows Synced / N pending / Error / Offline. "Sync now" button in Settings triggers one-off push. |
-| 7B | Pull (Supabase → local Room DB) | **built and exercised by user on phone** | PullDtos (StrokeRowDto, PaymentRowDto), StrokePuller, PaymentPuller fetch from Supabase via postgrest.from().select(). PullManager merges: new rows inserted as SYNCED, PENDING rows skipped (local wins), server version newer → update, server deleted → soft-delete. SyncWorker runs push then pull in sequence. Sync runs every 15 min automatically or on demand via "Sync now". |
-| 8 | Backup and recovery | not started | |
-| 9 | Final validation + release APK | not started | |
+| 7B | Pull (Supabase → local Room DB) | PARTIAL: pull/restore built and exercised by user on phone; conflict screen, sign-out wipe and version-cursor paging NOT built | Pull downloads ALL rows each time (no lastPulledVersion cursor, no paging). Open vs prompts.md 7B: item 1 (cursor + mark CONFLICT instead of skipping pending rows), item 4 (conflict screen), item 5 (sign-out wipe, D10), item 7 (pure-logic tests). |
+| 8 | Backup and recovery | built; gaps closed by BackupRules refactor + tests | BackupManager (SAF export, OpenDocument import), BackupRules, Settings UI (Export/Import, MERGE or REPLACE, typed REPLACE confirmation, account-mismatch confirmation), docs/BACKUP.md. User's real export checked: checksum valid, 36 strokes (2026-09-02 to 2026-10-14), 0 payments, no duplicate dates. Payment export/import NOT exercised with real data. BackupRulesTest.kt is an EMPTY file, no backup unit tests exist. |
+| 9 | Final validation + release APK | not started | Do after the Task 8 gaps and 7B leftovers are closed or knowingly accepted. |
+| UI-1 | Settings final UI pass + Hide Currency (Home) + Working Days (Settings) | verified by user | Not in prompts.md (extra work). |
 
 ## Log
 - 5A-5C: Verified by user.
@@ -44,7 +45,22 @@ The agent updates this after every task. Mark a task done only after the user ap
 - 7A-2b: Full sync push implemented. Files: data/sync/SyncState.kt (sealed SyncState: Synced/Pending/Error/Offline), data/sync/SyncRepository.kt (exposes pending count + sync state over Room Flow), data/sync/SyncScheduler.kt (WorkManager: periodic 15-min push with network constraint + exponential backoff; syncNow() one-off via OneTimeWorkRequest), data/sync/SyncWorker.kt (CoroutineWorker; reads userId directly from SupabaseProvider.client.auth to avoid SessionUserProvider race), data/sync/SyncManager.kt (pushes every PENDING_UPSERT/PENDING_DELETE stroke + payment row; Ok → markSynced with server version, Conflict → markConflict, PermanentError/Malformed → markError, network → rethrown for retry). UI: SyncChip on Home top row, "Sync now" button in Settings. Build passes; 54 pending rows pushed to Supabase; data visible in Supabase Table Editor (daily_strokes + payments). Verified by user on phone.
 - 7B: Pull implemented. Files: data/remote/dto/PullDtos.kt (StrokeRowDto, PaymentRowDto matching server column names), data/sync/Pullers.kt (StrokePuller, PaymentPuller using postgrest.from("table").select(), RLS handles user filtering), data/sync/PullManager.kt (merge: new rows inserted as SYNCED, PENDING rows skipped so local wins, server version newer → update, server deleted → soft-delete). SyncWorker updated to run push then pull in sequence. Sync runs every 15 min automatically or on demand via "Sync now". Verified by user on phone.
 - Sync architecture summary: local write → Room (PENDING_UPSERT/PENDING_DELETE) → WorkManager (network-constrained, exponential backoff) → SyncWorker → SyncManager → StrokePusher/PaymentPusher (Supabase RPC thecount_push_stroke / thecount_push_payment) → parsePushResponse → mark SYNCED/CONFLICT/ERROR → SyncManager → PullManager → Pullers (postgrest select) → merge into Room. One global version sequence on the server; strokes and payments have separate pull cursors. Rows owned by "local"/"anonymous" never pushed. Delete vs upsert decided by deletedAt != null, not sync_state. Money is BigDecimal, 2 decimals, HALF_UP, never Double/Float. No tokens, emails or payloads in logs.
-- Current app status: Sync fully working on device. 54 rows pushed and visible in Supabase. Pull merges server rows into local Room. Auto-sync every 15 min + manual "Sync now". Remaining: Task 8 (backup and recovery), Task 9 (final validation + release APK).
+- Sync fix (commit 0238bfa): Pullers.kt, SyncScheduler.kt, TheCountApp.kt changed. User confirmed sync works.
+- Task 8 (commit b38f1d8): BackupManager.kt, BackupRules.kt, Daos.kt, PaymentDao.kt, SettingsScreen.kt, docs/BACKUP.md, BackupRulesTest.kt (empty). Imported rows become PENDING_UPSERT and sync normally. REPLACE writes a safety copy to app cache.
+- Current app status: sync, backup export and import work on device. Remaining: close Task 8 and 7B gaps, then Task 9.
+- Unit tests counted by @Test (not re-run): PushResponseParser 30, Validators 9, EarningsCalculator 9, MoneyMask 6, AttachManager 4, ExampleUnitTest 1, BackupRules 0.
+
+## Known issues
+Resolved (remove): Home "Synced" label, dead AccessDeniedScreen.kt, stray file "tatus", "data only on this phone".
+Task 8 gaps:
+(1) MERGE logic looks inverted: BackupRules.shouldApplyImportedRecord applies in MERGE only when the existing row is NOT deleted, so MERGE overwrites active entries and does not restore soft-deleted ones. prompts.md says MERGE adds missing and never deletes.
+(2) Import does not check dates >= 2026-09-02 (and not in the future).
+(3) Payment amount check accepts >= 0 and any decimals; spec is > 0 and max 2 decimals.
+(4) Bad files can show raw JSON/format exceptions instead of a friendly message.
+(5) No backup unit tests (BackupRulesTest.kt is 0 bytes); validation is inside BackupManager and not testable.
+(6) docs/BACKUP.md claims rules the code does not enforce.
+Task 7B gaps: no version cursor/paging; pending rows skipped instead of CONFLICT; no conflict screen; sign-out wipe (D10) not implemented; no pull/merge tests.
+Other: no unit tests for payment validators; UI-1 not verified by user.
 
 ## Manual setup done by the user
 - [x] Android Studio + base project created
@@ -56,8 +72,6 @@ The agent updates this after every task. Mark a task done only after the user ap
 ## Manual steps for the user (from Task 6A)
 - If Google sign-in fails in release, ensure release SHA-1 is registered in Google Cloud OAuth client for Android.
 
-## Known issues
-- The Home status row shows "Synced", but sync is not built until Task 7. This label is wrong and must be changed to "Local only" until Task 7A works. Not fixed yet.
-- Duplicate dead file: app/src/main/java/com/sandesh/thecount/ui/screens/AccessDeniedScreen.kt (placeholder). The used one is app/src/main/kotlin/com/sandesh/thecount/ui/screens/auth/AccessDeniedScreen.kt. Not deleted yet.
-- Stray root file "tatus" (git log dump). Not deleted yet.
-- Data is stored ONLY on this phone until Task 7A (push sync) is done.| Settings final UI pass + Hide Currency (Home) | written, build OK, tests passed, not verified by user | written, MoneyMask tests included, NOT verified by user |
+
+
+

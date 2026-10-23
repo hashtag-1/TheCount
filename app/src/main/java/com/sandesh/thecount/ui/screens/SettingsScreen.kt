@@ -3,7 +3,12 @@ package com.sandesh.thecount.ui.screens
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,10 +17,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
@@ -35,20 +44,23 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sandesh.thecount.data.db.TheCountDatabase
@@ -58,6 +70,7 @@ import com.sandesh.thecount.data.repository.BackupManager
 import com.sandesh.thecount.data.repository.BackupMode
 import com.sandesh.thecount.data.repository.ValidatedBackup
 import com.sandesh.thecount.data.sync.SyncScheduler
+import com.sandesh.thecount.ui.viewmodel.HomeViewModel
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 
@@ -67,7 +80,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onLoginClick: () -> Unit,
     onSignOut: () -> Unit,
-    viewModel: com.sandesh.thecount.ui.viewmodel.HomeViewModel? = null
+    viewModel: HomeViewModel? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -192,14 +205,14 @@ fun SettingsScreen(
                             TextButton(
                                 onClick = { exportLauncher.launch("TheCount-backup.json") },
                                 enabled = !busy,
-                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                             ) { Text("Export Backup", style = MaterialTheme.typography.bodyLarge) }
                             TextButton(
                                 onClick = {
                                     importLauncher.launch(arrayOf("application/json", "text/json", "application/octet-stream"))
                                 },
                                 enabled = !busy,
-                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                             ) { Text("Import Backup", style = MaterialTheme.typography.bodyLarge) }
                         }
                     }
@@ -218,9 +231,7 @@ fun SettingsScreen(
                 }
 
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics {  },
+                    modifier = Modifier.fillMaxWidth(),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -238,19 +249,17 @@ fun SettingsScreen(
                             Text("Hide Currency", style = MaterialTheme.typography.titleMedium)
                             Text("Show XXXXX instead of amounts on Home", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                        Spacer(Modifier.width(12.dp))
                         Switch(checked = hide, onCheckedChange = null)
                     }
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FilledTonalButton(
-                        onClick = { SyncScheduler.syncNow(context) },
+                    SyncNowButton(
+                        state = SyncButtonState.Idle,
                         enabled = !busy,
-                        modifier = Modifier.weight(1f).height(52.dp)
-                    ) {
-                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                        Text("Sync Now", maxLines = 2)
-                    }
+                        onClick = { SyncScheduler.syncNow(context) }
+                    )
                     OutlinedButton(
                         onClick = { showSignOutDialog = true },
                         enabled = !busy,
@@ -295,7 +304,6 @@ fun SettingsScreen(
         )
     }
 
-    // keep backup dialogs omitted here for brevity? Need preserve. For minimal, include import dialog basic.
     backupToImport?.let { backup ->
         AlertDialog(
             onDismissRequest = { backupToImport = null; accountMismatchConfirmed = false },
@@ -323,3 +331,49 @@ fun SettingsScreen(
         )
     }
 }
+
+enum class SyncButtonState { Idle, Syncing, Synced, Failed }
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.SyncNowButton(state: SyncButtonState, enabled: Boolean, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val reducedMotion = android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    FilledTonalButton(
+        onClick = onClick,
+        enabled = enabled && state != SyncButtonState.Syncing,
+        modifier = Modifier.weight(1f).height(52.dp).semantics {
+            if (state == SyncButtonState.Syncing) stateDescription = "Syncing"
+            if (state == SyncButtonState.Synced) stateDescription = "Synced"
+        }
+    ) {
+        when (state) {
+            SyncButtonState.Syncing -> {
+                if (reducedMotion) Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                else SpinningRefreshIcon()
+                Spacer(Modifier.width(4.dp))
+                Text("Syncing…", maxLines = 2)
+            }
+            SyncButtonState.Synced -> {
+                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Synced", maxLines = 2)
+            }
+            else -> {
+                Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(if (state == SyncButtonState.Failed) "Sync Now" else "Sync Now", maxLines = 2)
+            }
+        }
+    }
+    if (state == SyncButtonState.Failed) {
+        Text("Sync failed. Try again.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite })
+    }
+}
+
+@Composable
+private fun SpinningRefreshIcon() {
+    val transition = rememberInfiniteTransition(label = "spin")
+    val angle by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Restart), label = "angle")
+    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp).rotate(angle))
+}
+

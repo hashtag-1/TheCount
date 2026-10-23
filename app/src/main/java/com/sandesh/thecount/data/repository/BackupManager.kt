@@ -172,41 +172,41 @@ class BackupManager(
         val strokes = mutableListOf<BackupStroke>()
         val strokeDates = mutableSetOf<LocalDate>()
         val strokeIds = mutableSetOf<UUID>()
+        val today = LocalDate.now()
 
         for (i in 0 until strokeArray.length()) {
-            val item = strokeArray.getJSONObject(i)
-            val date = BackupRules.parseDate(item.getString("date"))
-            val count = BackupRules.validateStrokeCount(item.getLong("count"))
-            val id = UUID.fromString(item.getString("id"))
-
-            BackupRules.addUniqueStrokeDate(date, strokeDates)
-            require(strokeIds.add(id)) {
-                "Duplicate stroke ID found: $id"
+            try {
+                val item = strokeArray.getJSONObject(i)
+                val date = BackupRules.parseDate(item.getString("date"))
+                BackupRules.validateDate(date, today)
+                val count = item.getLong("count")
+                BackupRules.validateStrokeCount(count)
+                val id = UUID.fromString(item.getString("id"))
+                BackupRules.addUniqueStrokeDate(date, strokeDates)
+                BackupRules.addUniqueId(id, strokeIds)
+                strokes += BackupStroke(id, date, count)
+            } catch (e: Exception) {
+                throw IllegalArgumentException("This backup file is damaged or not valid.", e)
             }
-
-            strokes += BackupStroke(id, date, count)
         }
 
         val payments = mutableListOf<BackupPayment>()
         val paymentIds = mutableSetOf<UUID>()
 
         for (i in 0 until paymentArray.length()) {
-            val item = paymentArray.getJSONObject(i)
-            val date = BackupRules.parseDate(item.getString("date"))
-            val amountString = item.getString("amount")
-            val id = UUID.fromString(item.getString("id"))
-            val amount = BackupRules.parsePaymentAmount(amountString)
-            require(paymentIds.add(id)) {
-                "Duplicate payment ID found: $id"
+            try {
+                val item = paymentArray.getJSONObject(i)
+                val date = BackupRules.parseDate(item.getString("date"))
+                BackupRules.validateDate(date, today)
+                val amountString = item.getString("amount")
+                val id = UUID.fromString(item.getString("id"))
+                val amount = BackupRules.parsePaymentAmount(amountString)
+                BackupRules.addUniqueId(id, paymentIds)
+                val note = if (item.isNull("note")) null else item.getString("note")
+                payments += BackupPayment(id, date, amount, note)
+            } catch (e: Exception) {
+                throw IllegalArgumentException("This backup file is damaged or not valid.", e)
             }
-
-            val note = if (item.isNull("note")) {
-                null
-            } else {
-                item.getString("note")
-            }
-
-            payments += BackupPayment(id, date, amount, note)
         }
 
         val allDates = strokes.map { it.date } +
