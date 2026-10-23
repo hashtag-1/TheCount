@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.sandesh.thecount.data.remote.SupabaseProvider
+import com.sandesh.thecount.data.sync.SyncScheduler
 import com.sandesh.thecount.ui.TheCountApp
 import com.sandesh.thecount.ui.theme.TheCountTheme
 
@@ -13,6 +14,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         SupabaseProvider.initialize(application)
+        SyncScheduler.schedule(application)
         setContent {
             TheCountTheme {
                 TheCountApp()

@@ -81,4 +81,34 @@ interface DailyStrokeDao {
         }
         return updated
     }
+
+    // ---- Sync (Task 7A) ----
+
+    /** Every row that still needs to go to the server, ordered oldest-first. */
+    @Query("SELECT * FROM daily_strokes WHERE user_id = :userId AND sync_state IN ('PENDING_UPSERT', 'PENDING_DELETE') ORDER BY updated_at ASC")
+    suspend fun getPending(userId: String): List<DailyStrokeEntity>
+
+    /** One row by id, for resolving a conflict against the server's current values. */
+    @Query("SELECT * FROM daily_strokes WHERE user_id = :userId AND id = :id")
+    suspend fun getById(userId: String, id: UUID): DailyStrokeEntity?
+
+    /** Mark a row as synced with the server-assigned version. */
+    @Query("UPDATE daily_strokes SET sync_state = 'SYNCED', server_version = :version, updated_at = :now WHERE user_id = :userId AND id = :id")
+    suspend fun markSynced(userId: String, id: UUID, version: Long, now: Long = System.currentTimeMillis())
+
+    /** Mark a row as in conflict, keeping the client's version for the user to resolve later. */
+    @Query("UPDATE daily_strokes SET sync_state = 'CONFLICT', updated_at = :now WHERE user_id = :userId AND id = :id")
+    suspend fun markConflict(userId: String, id: UUID, now: Long = System.currentTimeMillis())
+
+    /** Mark a row as an error (permanent Postgres rejection). Cleared by the next successful push. */
+    @Query("UPDATE daily_strokes SET sync_state = 'ERROR', updated_at = :now WHERE user_id = :userId AND id = :id")
+    suspend fun markError(userId: String, id: UUID, now: Long = System.currentTimeMillis())
+
+    /** Reset a row back to pending so the worker retries it. */
+    @Query("UPDATE daily_strokes SET sync_state = 'PENDING_UPSERT', updated_at = :now WHERE user_id = :userId AND id = :id")
+    suspend fun markPending(userId: String, id: UUID, now: Long = System.currentTimeMillis())
+
+    /** Live count of rows still waiting on the server. */
+    @Query("SELECT COUNT(*) FROM daily_strokes WHERE user_id = :userId AND sync_state IN ('PENDING_UPSERT', 'PENDING_DELETE')")
+    fun observePendingCount(userId: String): kotlinx.coroutines.flow.Flow<Int>
 }

@@ -28,14 +28,17 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sandesh.thecount.data.remote.SupabaseProvider
+import com.sandesh.thecount.data.repository.SyncRepository
+import com.sandesh.thecount.data.sync.SyncState
+import com.sandesh.thecount.ui.components.SyncChip
 import com.sandesh.thecount.ui.viewmodel.HomeViewModel
 import com.sandesh.thecount.util.MoneyFormat
 import io.github.jan.supabase.auth.auth
@@ -53,14 +56,21 @@ fun HomeScreen(
     onPaymentsClick: () -> Unit,
     onAddPaymentClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    viewModel: HomeViewModel
+    viewModel: HomeViewModel,
+    syncRepository: SyncRepository? = null
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val numberFormat = NumberFormat.getNumberInstance(Locale.US)
     val earnings = uiState.earnings
     val outstanding = earnings?.outstanding ?: BigDecimal.ZERO
     val session = SupabaseProvider.client.auth.currentSessionOrNull()
     val accountEmail = session?.user?.email ?: "Not signed in"
+
+    val syncState: SyncState = if (syncRepository == null) {
+        SyncState.Synced
+    } else {
+        syncRepository.syncState().collectAsStateWithLifecycle(initialValue = SyncState.Synced).value
+    }
 
     Scaffold(
         topBar = {
@@ -87,7 +97,11 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = LocalDate.now().toString(), style = MaterialTheme.typography.bodyMedium)
+                    Column(horizontalAlignment = Alignment.Start) {
+                        Text(text = LocalDate.now().toString(), style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        SyncChip(state = syncState)
+                    }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(text = accountEmail, style = MaterialTheme.typography.bodySmall)
                         Text(text = "Synced", style = MaterialTheme.typography.bodySmall)
@@ -150,10 +164,12 @@ fun HomeScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Outstanding Balance", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(8.dp))
-                    val (text, color) = when {
-                        outstanding.signum() == 0 -> MoneyFormat.format(outstanding) + " - Fully settled" to MaterialTheme.colorScheme.tertiary
-                        outstanding.signum() < 0 -> MoneyFormat.format(outstanding) + " - Overpaid / credit" to MaterialTheme.colorScheme.onSecondaryContainer
-                        else -> MoneyFormat.format(outstanding) to MaterialTheme.colorScheme.onSurface
+                    val text: String
+                    val color: Color
+                    when {
+                        outstanding.signum() == 0 -> { text = MoneyFormat.format(outstanding) + " - Fully settled"; color = MaterialTheme.colorScheme.tertiary }
+                        outstanding.signum() < 0  -> { text = MoneyFormat.format(outstanding) + " - Overpaid / credit"; color = MaterialTheme.colorScheme.onSecondaryContainer }
+                        else                       -> { text = MoneyFormat.format(outstanding); color = MaterialTheme.colorScheme.onSurface }
                     }
                     Text(
                         text = text,

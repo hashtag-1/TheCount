@@ -50,4 +50,28 @@ interface PaymentDao {
 
     @Query("SELECT * FROM payments WHERE user_id = 'local' AND deleted_at IS NULL")
     suspend fun getLocalPayments(): List<PaymentEntity>
+
+    // ---- Sync (Task 7A) ----
+
+    @Query("SELECT * FROM payments WHERE user_id = :userId AND sync_state IN ('PENDING_UPSERT', 'PENDING_DELETE') ORDER BY updated_at ASC")
+    suspend fun getPending(userId: String): List<PaymentEntity>
+
+    @Query("SELECT * FROM payments WHERE user_id = :userId AND id = :id")
+    suspend fun getById(userId: String, id: UUID): PaymentEntity?
+
+    @Query("UPDATE payments SET sync_state = 'SYNCED', server_version = :version, updated_at = :now WHERE user_id = :userId AND id = :id")
+    suspend fun markSynced(userId: String, id: UUID, version: Long, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE payments SET sync_state = 'CONFLICT', updated_at = :now WHERE user_id = :userId AND id = :id")
+    suspend fun markConflict(userId: String, id: UUID, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE payments SET sync_state = 'ERROR', updated_at = :now WHERE user_id = :userId AND id = :id")
+    suspend fun markError(userId: String, id: UUID, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE payments SET sync_state = 'PENDING_UPSERT', updated_at = :now WHERE user_id = :userId AND id = :id")
+    suspend fun markPending(userId: String, id: UUID, now: Long = System.currentTimeMillis())
+
+    /** Live count of rows still waiting on the server. */
+    @Query("SELECT COUNT(*) FROM payments WHERE user_id = :userId AND sync_state IN ('PENDING_UPSERT', 'PENDING_DELETE')")
+    fun observePendingCount(userId: String): kotlinx.coroutines.flow.Flow<Int>
 }

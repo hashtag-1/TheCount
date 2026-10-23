@@ -37,6 +37,7 @@ import com.sandesh.thecount.data.repository.AttachResult
 import com.sandesh.thecount.data.repository.SessionUserProvider
 import com.sandesh.thecount.data.repository.StrokeRepository
 import com.sandesh.thecount.data.repository.PaymentRepository
+import com.sandesh.thecount.data.repository.SyncRepository
 import com.sandesh.thecount.ui.navigation.Routes
 import com.sandesh.thecount.ui.screens.*
 import com.sandesh.thecount.ui.screens.auth.AccessDeniedScreen
@@ -60,6 +61,7 @@ fun TheCountApp() {
         PaymentRepository(TheCountDatabase.getInstance(app).paymentDao(), userProvider)
     }
     val attachManager = remember { AttachManager(strokeRepository, paymentRepository) }
+    val syncRepository = remember { SyncRepository(TheCountDatabase.getInstance(app), userProvider) }
 
     // Observe userId flow to trigger the attach prompt and to key the ViewModel
     val currentUserId by userProvider.currentUserIdFlow.collectAsState()
@@ -116,6 +118,7 @@ fun TheCountApp() {
                 navController = navController,
                 viewModel = viewModel,
                 authRepository = authRepository,
+                syncRepository = syncRepository,
                 initialRoute = if (hasValidSession) Routes.HOME else Routes.LOGIN
             )
         }
@@ -222,6 +225,7 @@ fun AppNavHost(
     navController: NavHostController,
     viewModel: HomeViewModel,
     authRepository: AuthRepository,
+    syncRepository: SyncRepository,
     initialRoute: String
 ) {
     val scope = rememberCoroutineScope()
@@ -246,7 +250,8 @@ fun AppNavHost(
                 onPaymentsClick = { navController.navigate(Routes.PAYMENTS) },
                 onAddPaymentClick = { navController.navigate(Routes.ADD_PAYMENT) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
-                viewModel = viewModel
+                viewModel = viewModel,
+                syncRepository = syncRepository
             )
         }
         composable(Routes.ENTRY) {
