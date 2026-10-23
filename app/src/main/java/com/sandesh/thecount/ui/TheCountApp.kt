@@ -296,7 +296,8 @@ fun AppNavHost(
                         authRepository.signOut()
                         navController.popBackStack(Routes.LOGIN, inclusive = true)
                     }
-                }
+                },
+                viewModel = viewModel
             )
         }
         composable(Routes.LOGIN) {

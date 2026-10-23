@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -65,7 +66,8 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onBack: () -> Unit,
     onLoginClick: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    viewModel: com.sandesh.thecount.ui.viewmodel.HomeViewModel? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -93,6 +95,8 @@ fun SettingsScreen(
 
     val prefs = remember { DisplayPreferences.getInstance(context) }
     val hide by prefs.hideCurrency.collectAsState()
+    val uiState = viewModel?.uiState?.collectAsState()?.value
+    val workingDays = uiState?.allStrokes?.count { it.strokeCount > 0 } ?: 0
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -172,7 +176,7 @@ fun SettingsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp),
+                                .heightIn(min = 48.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("Backup and Recovery", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -208,8 +212,8 @@ fun SettingsScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Working Days", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        Text("0", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                        Text("Working Days", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f).semantics { contentDescription = "Working days, $workingDays" })
+                        Text(workingDays.toString(), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
                     }
                 }
 
@@ -224,7 +228,7 @@ fun SettingsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp)
+                            .heightIn(min = 56.dp)
                             .padding(16.dp)
                             .semantics { stateDescription = if (hide) "On" else "Off" }
                             .toggleable(value = hide, role = Role.Switch, onValueChange = { prefs.setHideCurrency(it) }),

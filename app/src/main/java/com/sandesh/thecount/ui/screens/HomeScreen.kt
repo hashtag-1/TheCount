@@ -1,6 +1,9 @@
 package com.sandesh.thecount.ui.screens
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.collectAsState
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -30,7 +33,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,6 +49,8 @@ import com.sandesh.thecount.ui.components.LabelValue
 import com.sandesh.thecount.ui.theme.Spacing
 import com.sandesh.thecount.ui.viewmodel.HomeViewModel
 import com.sandesh.thecount.util.MoneyFormat
+import com.sandesh.thecount.util.MoneyMask
+import com.sandesh.thecount.data.prefs.DisplayPreferences
 import io.github.jan.supabase.auth.auth
 import java.math.BigDecimal
 import java.text.NumberFormat
@@ -64,6 +72,9 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val numberFormat = NumberFormat.getNumberInstance(Locale.US)
     val earnings = uiState.earnings
+    val context = LocalContext.current
+    val prefs = remember { DisplayPreferences.getInstance(context) }
+    val hide by prefs.hideCurrency.collectAsState()
     val outstanding = earnings?.outstanding ?: BigDecimal.ZERO
     val session = SupabaseProvider.client.auth.currentSessionOrNull()
     val accountEmail = session?.user?.email ?: "Not signed in"
@@ -102,7 +113,7 @@ fun HomeScreen(
                             Icon(imageVector = Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                         Spacer(modifier = Modifier.height(Spacing.sm))
-                        Text(text = earnings?.net?.let { MoneyFormat.format(it) } ?: "-", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text(text = MoneyMask.display(hide) { earnings?.net?.let { MoneyFormat.format(it) } ?: "-" }, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" })
                     }
                 }
             }
@@ -112,30 +123,28 @@ fun HomeScreen(
                     val shouldStack = maxWidth < 360.dp || fontScale > 1.15f
                     if (shouldStack) {
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                            AppCard(onClick = onPaymentsClick, modifier = Modifier.fillMaxWidth()) { LabelValue(label = "Payments Received", value = MoneyFormat.format(uiState.paymentsTotalUpToSelected), valueStyle = MaterialTheme.typography.headlineSmall) }
+                            AppCard(onClick = onPaymentsClick, modifier = Modifier.fillMaxWidth()) { LabelValue(label = "Payments Received", value = MoneyMask.display(hide) { MoneyFormat.format(uiState.paymentsTotalUpToSelected) }, valueStyle = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" }) }
                             AppCard(modifier = Modifier.fillMaxWidth()) {
                                 Column {
                                     Text(text = "Outstanding Balance", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.height(Spacing.xs))
                                     when {
-                                        outstanding.signum() == 0 -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface); Spacer(modifier = Modifier.height(Spacing.xs)); InfoChip(text = "Fully settled", tone = com.sandesh.thecount.ui.components.ChipTone.Positive) }
-                                        outstanding.signum() < 0 -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface); Spacer(modifier = Modifier.height(Spacing.xs)); InfoChip(text = "Overpaid / credit", tone = com.sandesh.thecount.ui.components.ChipTone.Neutral) }
-                                        else -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface) }
+                                        hide -> { Text(text = MoneyMask.HIDDEN, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { contentDescription = "Amount hidden" }) }
+                                        else -> { Text(text = MoneyMask.display(hide) { MoneyFormat.format(outstanding) }, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" }) }
                                     }
                                 }
                             }
                         }
                     } else {
                         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                            AppCard(onClick = onPaymentsClick, modifier = Modifier.weight(1f).fillMaxHeight()) { LabelValue(label = "Payments Received", value = MoneyFormat.format(uiState.paymentsTotalUpToSelected), valueStyle = MaterialTheme.typography.headlineSmall) }
+                            AppCard(onClick = onPaymentsClick, modifier = Modifier.weight(1f).fillMaxHeight()) { LabelValue(label = "Payments Received", value = MoneyMask.display(hide) { MoneyFormat.format(uiState.paymentsTotalUpToSelected) }, valueStyle = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" }) }
                             AppCard(modifier = Modifier.weight(1f).fillMaxHeight()) {
                                 Column {
                                     Text(text = "Outstanding Balance", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.height(Spacing.xs))
                                     when {
-                                        outstanding.signum() == 0 -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface); Spacer(modifier = Modifier.height(Spacing.xs)); InfoChip(text = "Fully settled", tone = com.sandesh.thecount.ui.components.ChipTone.Positive) }
-                                        outstanding.signum() < 0 -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface); Spacer(modifier = Modifier.height(Spacing.xs)); InfoChip(text = "Overpaid / credit", tone = com.sandesh.thecount.ui.components.ChipTone.Neutral) }
-                                        else -> { Text(text = MoneyFormat.format(outstanding), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface) }
+                                        hide -> { Text(text = MoneyMask.HIDDEN, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { contentDescription = "Amount hidden" }) }
+                                        else -> { Text(text = MoneyMask.display(hide) { MoneyFormat.format(outstanding) }, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" }) }
                                     }
                                 }
                             }
@@ -176,3 +185,4 @@ fun HomeScreen(
         }
     }
 }
+
