@@ -1,6 +1,9 @@
 package com.sandesh.thecount.ui.screens
 
 import android.content.Context
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
@@ -9,6 +12,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,14 +21,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
@@ -44,25 +44,25 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.sandesh.thecount.data.db.TheCountDatabase
 import com.sandesh.thecount.data.prefs.DisplayPreferences
 import com.sandesh.thecount.data.remote.SupabaseProvider
@@ -70,8 +70,8 @@ import com.sandesh.thecount.data.repository.BackupManager
 import com.sandesh.thecount.data.repository.BackupMode
 import com.sandesh.thecount.data.repository.ValidatedBackup
 import com.sandesh.thecount.data.sync.SyncScheduler
-import com.sandesh.thecount.ui.viewmodel.HomeViewModel
 import io.github.jan.supabase.auth.auth
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -80,7 +80,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onLoginClick: () -> Unit,
     onSignOut: () -> Unit,
-    viewModel: HomeViewModel? = null
+    viewModel: com.sandesh.thecount.ui.viewmodel.HomeViewModel? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -110,6 +110,14 @@ fun SettingsScreen(
     val hide by prefs.hideCurrency.collectAsState()
     val uiState = viewModel?.uiState?.collectAsState()?.value
     val workingDays = uiState?.allStrokes?.count { it.strokeCount > 0 } ?: 0
+
+    // The Sync Now icon spins while a sync is running, and for at least 1.2 s
+    // so even a very fast sync is visible.
+    val syncWorkInfos by WorkManager.getInstance(context)
+        .getWorkInfosForUniqueWorkFlow("thecount-sync-now")
+        .collectAsState(initial = emptyList())
+    var minSpin by remember { mutableStateOf(false) }
+    val syncing = minSpin || syncWorkInfos.any { it.state == WorkInfo.State.RUNNING }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -205,14 +213,14 @@ fun SettingsScreen(
                             TextButton(
                                 onClick = { exportLauncher.launch("TheCount-backup.json") },
                                 enabled = !busy,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                                modifier = Modifier.fillMaxWidth().height(48.dp)
                             ) { Text("Export Backup", style = MaterialTheme.typography.bodyLarge) }
                             TextButton(
                                 onClick = {
                                     importLauncher.launch(arrayOf("application/json", "text/json", "application/octet-stream"))
                                 },
                                 enabled = !busy,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                                modifier = Modifier.fillMaxWidth().height(48.dp)
                             ) { Text("Import Backup", style = MaterialTheme.typography.bodyLarge) }
                         }
                     }
@@ -231,7 +239,9 @@ fun SettingsScreen(
                 }
 
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics {  },
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -246,20 +256,29 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Hide Currency", style = MaterialTheme.typography.titleMedium)
-                            Text("Show XXXXX instead of amounts on Home", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Home Screen Privacy", style = MaterialTheme.typography.titleMedium)
+                            Text("Show XXXXX instead of amounts and cumulative strokes on Home", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Spacer(Modifier.width(12.dp))
                         Switch(checked = hide, onCheckedChange = null)
                     }
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SyncNowButton(
-                        state = SyncButtonState.Idle,
+                    FilledTonalButton(
+                        onClick = {
+                            SyncScheduler.syncNow(context)
+                            scope.launch {
+                                minSpin = true
+                                delay(1200)
+                                minSpin = false
+                            }
+                        },
                         enabled = !busy,
-                        onClick = { SyncScheduler.syncNow(context) }
-                    )
+                        modifier = Modifier.weight(1f).height(52.dp)
+                    ) {
+                        SyncIcon(spinning = syncing)
+                        Text("Sync Now", maxLines = 2)
+                    }
                     OutlinedButton(
                         onClick = { showSignOutDialog = true },
                         enabled = !busy,
@@ -304,6 +323,7 @@ fun SettingsScreen(
         )
     }
 
+    // Basic backup import confirmation dialog.
     backupToImport?.let { backup ->
         AlertDialog(
             onDismissRequest = { backupToImport = null; accountMismatchConfirmed = false },
@@ -332,48 +352,29 @@ fun SettingsScreen(
     }
 }
 
-enum class SyncButtonState { Idle, Syncing, Synced, Failed }
-
+// Refresh icon that rotates while a sync is running. The angle is calculated from the
+// frame clock, so it keeps spinning even when the phone's animation setting is turned off.
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.SyncNowButton(state: SyncButtonState, enabled: Boolean, onClick: () -> Unit) {
-    val context = LocalContext.current
-    val reducedMotion = android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    FilledTonalButton(
-        onClick = onClick,
-        enabled = enabled && state != SyncButtonState.Syncing,
-        modifier = Modifier.weight(1f).height(52.dp).semantics {
-            if (state == SyncButtonState.Syncing) stateDescription = "Syncing"
-            if (state == SyncButtonState.Synced) stateDescription = "Synced"
-        }
-    ) {
-        when (state) {
-            SyncButtonState.Syncing -> {
-                if (reducedMotion) Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                else SpinningRefreshIcon()
-                Spacer(Modifier.width(4.dp))
-                Text("Syncing…", maxLines = 2)
-            }
-            SyncButtonState.Synced -> {
-                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Synced", maxLines = 2)
-            }
-            else -> {
-                Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(if (state == SyncButtonState.Failed) "Sync Now" else "Sync Now", maxLines = 2)
+private fun SyncIcon(spinning: Boolean) {
+    if (spinning) {
+        val angle = remember { mutableStateOf(0f) }
+        LaunchedEffect(Unit) {
+            val start = withFrameNanos { it }
+            while (true) {
+                withFrameNanos { now ->
+                    val elapsedMs = (now - start) / 1_000_000f
+                    angle.value = (elapsedMs % 900f) / 900f * 360f
+                }
             }
         }
-    }
-    if (state == SyncButtonState.Failed) {
-        Text("Sync failed. Try again.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite })
+        Icon(
+            Icons.Filled.Refresh,
+            contentDescription = null,
+            modifier = Modifier
+                .padding(end = 4.dp)
+                .graphicsLayer { rotationZ = angle.value }
+        )
+    } else {
+        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
     }
 }
-
-@Composable
-private fun SpinningRefreshIcon() {
-    val transition = rememberInfiniteTransition(label = "spin")
-    val angle by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Restart), label = "angle")
-    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp).rotate(angle))
-}
-

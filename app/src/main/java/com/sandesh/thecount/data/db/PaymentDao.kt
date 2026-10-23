@@ -165,4 +165,18 @@ interface PaymentDao {
         AND sync_state IN ('PENDING_UPSERT', 'PENDING_DELETE')
     """)
     fun observePendingCount(userId: String): Flow<Int>
+
+    // Pull reconciliation: ids of rows the phone believes are already on the server.
+    // PullManager compares these against the server's list and removes the ones that are gone.
+
+    @Query("""
+        SELECT id FROM payments
+        WHERE user_id = :userId
+        AND sync_state = 'SYNCED'
+    """)
+    suspend fun getSyncedIds(userId: String): List<UUID>
+
+    // Permanently removes one local row. Used only when the server no longer has that row.
+    @Query("DELETE FROM payments WHERE user_id = :userId AND id = :id")
+    suspend fun hardDelete(userId: String, id: UUID)
 }

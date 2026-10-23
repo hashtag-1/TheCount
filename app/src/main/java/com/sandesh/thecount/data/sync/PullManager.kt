@@ -69,7 +69,7 @@ class PullManager(
                 val existing: DailyStrokeEntity? = db.dailyStrokeDao().getById(userId, id)
 
                 if (existing == null) {
-                    if (!dto.deleted) {
+                    if (dto.deletedAt == null) {
                         db.dailyStrokeDao().insert(
                             DailyStrokeEntity(
                                 id = id,
@@ -89,7 +89,7 @@ class PullManager(
                     val serverNewer = dto.version > (existing.serverVersion ?: -1L)
                     if (serverNewer) {
                         val now = System.currentTimeMillis()
-                        if (dto.deleted) {
+                        if (dto.deletedAt == null) {
                             db.dailyStrokeDao().update(
                                 existing.copy(
                                     deletedAt = now,
@@ -137,7 +137,7 @@ class PullManager(
                 val serverAmount = BigDecimal(dto.amount.content).setScale(2, RoundingMode.HALF_UP)
 
                 if (existing == null) {
-                    if (!dto.deleted) {
+                    if (dto.deletedAt == null) {
                         db.paymentDao().insert(
                             PaymentEntity(
                                 id = id,
@@ -157,7 +157,7 @@ class PullManager(
                     val serverNewer = dto.version > (existing.serverVersion ?: -1L)
                     if (serverNewer) {
                         val now = System.currentTimeMillis()
-                        if (dto.deleted) {
+                        if (dto.deletedAt != null) {
                             db.paymentDao().update(
                                 existing.copy(
                                     deletedAt = now,

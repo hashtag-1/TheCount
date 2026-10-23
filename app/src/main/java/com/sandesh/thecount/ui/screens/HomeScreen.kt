@@ -1,9 +1,6 @@
 package com.sandesh.thecount.ui.screens
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.collectAsState
-import kotlinx.coroutines.flow.flowOf
+
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -30,16 +27,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sandesh.thecount.data.prefs.DisplayPreferences
 import com.sandesh.thecount.data.remote.SupabaseProvider
 import com.sandesh.thecount.data.repository.SyncRepository
 import com.sandesh.thecount.data.sync.SyncState
@@ -50,12 +52,12 @@ import com.sandesh.thecount.ui.theme.Spacing
 import com.sandesh.thecount.ui.viewmodel.HomeViewModel
 import com.sandesh.thecount.util.MoneyFormat
 import com.sandesh.thecount.util.MoneyMask
-import com.sandesh.thecount.data.prefs.DisplayPreferences
 import io.github.jan.supabase.auth.auth
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.util.Locale
+import kotlinx.coroutines.flow.flowOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,7 +133,7 @@ fun HomeScreen(
                             Icon(imageVector = Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                         Spacer(modifier = Modifier.height(Spacing.sm))
-                        Text(text = MoneyMask.display(hide) { earnings?.net?.let { MoneyFormat.format(it) } ?: "-" }, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" })
+                        Text(text = MoneyMask.display(hide) { earnings?.net?.let { MoneyFormat.format(it) } ?: "-" }, style = MaterialTheme.typography.displaySmall.maskedIf(hide), color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" })
                     }
                 }
             }
@@ -141,13 +143,13 @@ fun HomeScreen(
                     val shouldStack = maxWidth < 360.dp || fontScale > 1.15f
                     if (shouldStack) {
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                            AppCard(onClick = onPaymentsClick, modifier = Modifier.fillMaxWidth()) { LabelValue(label = "Payments Received", value = MoneyMask.display(hide) { MoneyFormat.format(uiState.paymentsTotalUpToSelected) }, valueStyle = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" }) }
+                            AppCard(onClick = onPaymentsClick, modifier = Modifier.fillMaxWidth()) { LabelValue(label = "Payments Received", value = MoneyMask.display(hide) { MoneyFormat.format(uiState.paymentsTotalUpToSelected) }, valueStyle = MaterialTheme.typography.headlineSmall.maskedIf(hide), modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" }) }
                             AppCard(modifier = Modifier.fillMaxWidth()) {
                                 Column {
                                     Text(text = "Outstanding Balance", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.height(Spacing.xs))
                                     when {
-                                        hide -> { Text(text = MoneyMask.HIDDEN, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { contentDescription = "Amount hidden" }) }
+                                        hide -> { Text(text = MoneyMask.HIDDEN, style = MaterialTheme.typography.headlineSmall.maskedIf(true), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { contentDescription = "Amount hidden" }) }
                                         else -> { Text(text = MoneyMask.display(hide) { MoneyFormat.format(outstanding) }, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" }) }
                                     }
                                 }
@@ -155,13 +157,13 @@ fun HomeScreen(
                         }
                     } else {
                         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                            AppCard(onClick = onPaymentsClick, modifier = Modifier.weight(1f).fillMaxHeight()) { LabelValue(label = "Payments Received", value = MoneyMask.display(hide) { MoneyFormat.format(uiState.paymentsTotalUpToSelected) }, valueStyle = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" }) }
+                            AppCard(onClick = onPaymentsClick, modifier = Modifier.weight(1f).fillMaxHeight()) { LabelValue(label = "Payments Received", value = MoneyMask.display(hide) { MoneyFormat.format(uiState.paymentsTotalUpToSelected) }, valueStyle = MaterialTheme.typography.headlineSmall.maskedIf(hide), modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" }) }
                             AppCard(modifier = Modifier.weight(1f).fillMaxHeight()) {
                                 Column {
                                     Text(text = "Outstanding Balance", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.height(Spacing.xs))
                                     when {
-                                        hide -> { Text(text = MoneyMask.HIDDEN, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { contentDescription = "Amount hidden" }) }
+                                        hide -> { Text(text = MoneyMask.HIDDEN, style = MaterialTheme.typography.headlineSmall.maskedIf(true), color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { contentDescription = "Amount hidden" }) }
                                         else -> { Text(text = MoneyMask.display(hide) { MoneyFormat.format(outstanding) }, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" }) }
                                     }
                                 }
@@ -174,7 +176,7 @@ fun HomeScreen(
                 OutlinedButton(onClick = onAddPaymentClick, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("+ Add payment") }
             }
             item {
-                AppCard(modifier = Modifier.fillMaxWidth()) { LabelValue(label = "Cumulative Strokes", value = numberFormat.format(uiState.cumulativeStrokes), valueStyle = MaterialTheme.typography.headlineMedium, valueColor = MaterialTheme.colorScheme.primary) }
+                AppCard(modifier = Modifier.fillMaxWidth()) { LabelValue(label = "Cumulative Strokes", value = MoneyMask.display(hide) { numberFormat.format(uiState.cumulativeStrokes) }, valueStyle = MaterialTheme.typography.headlineMedium.maskedIf(hide), valueColor = MaterialTheme.colorScheme.primary, modifier = Modifier.semantics { if (hide) contentDescription = "Amount hidden" }) }
             }
             item {
                 AppCard(onClick = onEntryClick, modifier = Modifier.fillMaxWidth()) {
@@ -204,3 +206,6 @@ fun HomeScreen(
     }
 }
 
+// When privacy mode is on, the XXXXX placeholder is drawn in a smaller font than the real number.
+private fun TextStyle.maskedIf(hide: Boolean): TextStyle =
+    if (hide && fontSize.isSpecified) copy(fontSize = fontSize * 0.75f) else this

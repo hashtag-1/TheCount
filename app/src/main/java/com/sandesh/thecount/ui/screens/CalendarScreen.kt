@@ -1,5 +1,5 @@
 package com.sandesh.thecount.ui.screens
-
+import java.time.DayOfWeek
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -198,6 +198,7 @@ fun CalendarScreen(
 }
 
 // A normal row: just the date and the saved count. Tap it to edit.
+// Saturdays are shown with a light red background and cannot be edited.
 @Composable
 private fun DayRow(
     date: LocalDate,
@@ -205,11 +206,18 @@ private fun DayRow(
     justSaved: Boolean,
     onClick: () -> Unit
 ) {
+    val isSaturday = date.dayOfWeek == DayOfWeek.SATURDAY
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
+                .then(
+                    if (isSaturday) {
+                        Modifier.background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f))
+                    } else {
+                        Modifier.clickable(onClick = onClick)
+                    }
+                )
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -227,15 +235,17 @@ private fun DayRow(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
             }
-            Text(
-                text = savedCount?.let { countFormat.format(it) } ?: "No entry",
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (savedCount == null) {
-                    MaterialTheme.colorScheme.outline
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                }
-            )
+            if (!(isSaturday && savedCount == null)) {
+                Text(
+                    text = savedCount?.let { countFormat.format(it) } ?: "No entry",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (savedCount == null) {
+                        MaterialTheme.colorScheme.outline
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
+                )
+            }
         }
         HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
     }

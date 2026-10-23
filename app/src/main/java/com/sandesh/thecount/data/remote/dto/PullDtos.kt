@@ -14,7 +14,7 @@ data class StrokeRowDto(
     val id: String,
     @SerialName("work_date")    val workDate: String,
     @SerialName("stroke_count") val strokeCount: Long,
-    val deleted: Boolean = false,
+    @SerialName("deleted_at") val deletedAt: String? = null,
     val version: Long
 )
 
@@ -28,6 +28,6 @@ data class PaymentRowDto(
     @SerialName("payment_date") val paymentDate: String,
     val amount: JsonPrimitive,
     val note: String? = null,
-    val deleted: Boolean = false,
+    @SerialName("deleted_at") val deletedAt: String? = null,
     val version: Long
 )

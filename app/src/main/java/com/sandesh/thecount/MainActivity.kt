@@ -21,4 +21,11 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    // Runs every time the app comes to the foreground, so edits made in the
+    // database show up as soon as you reopen the app.
+    override fun onStart() {
+        super.onStart()
+        SyncScheduler.syncNow(application)
+    }
 }
